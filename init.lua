@@ -60,7 +60,11 @@ function new(tbl)
 
 	if tbl.channels then
 		for k,channel in ipairs(tbl.channels) do
-			conn:join(channel)
+			if type(channel) == "table" then
+				conn:join(assert(channel.name, "Malformed channel object"), channel.key)
+			else 
+				conn:join(channel)
+			end
 		end
 	end
 

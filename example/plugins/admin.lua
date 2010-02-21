@@ -9,24 +9,21 @@ local conf = require "ircbot.config"
 local whois, reloadPlugins
 
 function Load(bot)
-	whois = function(nick)
-		return bot:whois(nick)
-	end
-
-	reloadPlugins = function(path)
-		return bot:reloadPlugins(path)
-	end
+	BOT = bot
 end
 
 local loggedIn = {}
 local Admins = conf.load("admins.lua", {"admins"}).admins
 
 function public.isAdmin(nick, host)
-	if loggedIn[host] then 
+	nick = nick or user.nick
+	host = host or user.host
+	
+	if loggedIn[host] then
 		return true 
 	end
 
-	local info = whois(nick)
+	local info = BOT:whois(nick)
 	for k,accname in ipairs(Admins) do
 		if accname == info.account then
 			loggedIn[host] = true
@@ -36,10 +33,7 @@ function public.isAdmin(nick, host)
 	return false
 end
 
-function public.check()
-	return isAdmin(user.nick, user.host)
-end
-
+--bot administration
 Command "login"
 {
 	ExpectedArgs = 1;
@@ -57,7 +51,36 @@ Command "reload"
 	function(dir)
 		if not isAdmin() then return end
 		
-		local succ, err = reloadPlugins(dir or CONFIG.plugindir)
+		local succ, err = BOT:loadPlugins(dir or CONFIG.plugindir)
 		reply(succ and "Reloaded plugins." or err)
+	end
+}
+
+Command "quit"
+{
+	function(message)
+		BOT:disconnect(message)
+		os.exit()
+	end
+}
+
+--irc helpers
+Command "join"
+{
+	expectedArgs = -1;
+	
+	function(channel, key)
+		BOT:join(channel, key)
+		reply("Joined %s", channel)
+	end
+}
+
+Command "part"
+{
+	expectedArgs = 1;
+
+	function(channel)
+		BOT:part(channel)
+		reply("Left %s", channel)
 	end
 }
