@@ -59,6 +59,7 @@ Command "reload"
 Command "quit"
 {
 	function(message)
+		if not isAdmin() then return end
 		BOT:disconnect(message)
 		os.exit()
 	end
@@ -70,6 +71,7 @@ Command "join"
 	expectedArgs = -1;
 	
 	function(channel, key)
+		if not isAdmin() then return end
 		BOT:join(channel, key)
 		reply("Joined %s", channel)
 	end
@@ -80,6 +82,7 @@ Command "part"
 	expectedArgs = 1;
 
 	function(channel)
+		if not isAdmin() then return end
 		BOT:part(channel)
 		reply("Left %s", channel)
 	end
