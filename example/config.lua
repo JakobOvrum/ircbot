@@ -13,7 +13,7 @@ plugindir = "plugins"
 
 function startup(bot)
 	bot:sendChat("jA_cOp", "I authed!")
-	bot:sendChat("AuthServ", "AUTH 123456")
+	bot:sendChat("AuthServ", "AUTH replacethis. Maybe that'll work.")
 	bot:setmode{ add = "x" }
 end
 
