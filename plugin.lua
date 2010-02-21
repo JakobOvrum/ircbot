@@ -4,12 +4,25 @@ local _G = _G
 local cmd = require "ircbot.command"
 local irc = require "irc"
 
+local shared = setmetatable({}, {
+	__index = function(o, k)
+		local v = rawget(o, k)
+		if v == nil then
+			v = _G[k]
+		end
+		return v
+	end
+})
+
 local pluginMeta = {
 	__index = function(o, k)
 		local v = rawget(o, k)
-
+		
 		if v == nil then
-			v = _G[k]
+			v = rawget(o, "public")[k]
+			if v == nil then
+				v = shared[k]
+			end
 		end
 
 		return v
@@ -38,7 +51,8 @@ local function createPluginEnv(f, bot)
 
 	p.color, p.bold, p.underline = irc.color, irc.bold, irc.underline
 
-	p.context = {}
+	p.environment = shared
+	p.public = {}
 	setfenv(f, p)
 	
 	return setmetatable(p, pluginMeta)
@@ -103,8 +117,13 @@ function bot:loadPlugins(dir)
 			end
 
 			plugin.Path = path
+			plugin.ModuleName = path:match("^(.-).lua")
 			table.insert(plugins, plugin)
 		end
+	end
+
+	for k,plugin in ipairs(plugins) do
+		shared[plugin.ModuleName] = plugin.public
 	end
 
 	return plugins

@@ -6,23 +6,27 @@ PLUGIN.Name = "Administration"
 
 local conf = require "ircbot.config"
 
-local Bot
-local Admins
+local whois, reloadPlugins
+
 function Load(bot)
-	Bot = bot
-	Admins = conf.load("admins.lua", {"admins"}).admins
+	whois = function(nick)
+		return bot:whois(nick)
+	end
+
+	reloadPlugins = function(path)
+		return bot:reloadPlugins(path)
+	end
 end
 
 local loggedIn = {}
+local Admins = conf.load("admins.lua", {"admins"}).admins
 
-function isAdmin()
-	local host = context.user.host
-
+function public.isAdmin(nick, host)
 	if loggedIn[host] then 
 		return true 
 	end
 
-	local info = Bot:whois(context.user.nick)
+	local info = whois(nick)
 	for k,accname in ipairs(Admins) do
 		if accname == info.account then
 			loggedIn[host] = true
@@ -32,14 +36,18 @@ function isAdmin()
 	return false
 end
 
+function public.check()
+	return isAdmin(user.nick, user.host)
+end
+
 Command "login"
 {
 	ExpectedArgs = 1;
 	
 	function(password)
 		if CONFIG.password == password then
-			reply("Welcome, %s", context.user.nick)
-			loggedIn[context.user.host] = true
+			reply("Welcome, %s", user.nick)
+			loggedIn[user.host] = true
 		end
 	end
 }
@@ -49,7 +57,7 @@ Command "reload"
 	function(dir)
 		if not isAdmin() then return end
 		
-		local succ, err = Bot:loadPlugins(dir or CONFIG.plugindir)
+		local succ, err = reloadPlugins(dir or CONFIG.plugindir)
 		reply(succ and "Reloaded plugins." or err)
 	end
 }

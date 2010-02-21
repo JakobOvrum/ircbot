@@ -88,10 +88,10 @@ function OnChat(s, user, channel, msg)
 		s:sendChat(channel, msg)
 	end
 
-	local con = cmd.plugin.context
-	con.channel = channel
-	con.user = user
-
+	local env = cmd.plugin.environment
+	env.channel = channel
+	env.user = user
+	
 	local f = function()
 		if type(args) == "table" then
 			cmd.cb(unpack(args))
