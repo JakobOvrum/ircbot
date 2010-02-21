@@ -74,7 +74,7 @@ function new(tbl)
 	
 	return setmetatable({conn = conn; 
 						config = tbl; 
-						plugins = {}; 
+						plugins = {};
 						thinks = {};
 						}, bot), tbl
 end
