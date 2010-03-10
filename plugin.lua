@@ -1,33 +1,20 @@
-local bot = _BOT
-local _G = _G
-
-local cmd = require "ircbot.command"
+local lfs = require "lfs"
 local irc = require "irc"
 
-local shared = setmetatable({}, {
-	__index = function(o, k)
-		local v = rawget(o, k)
-		if v == nil then
-			v = _G[k]
-		end
-		return v
-	end
-})
+local setmetatable = setmetatable
+local error = error
+local setfenv = setfenv
+local loadfile = loadfile
+local pcall = pcall
+local pairs = pairs
+local ipairs = ipairs
+local table = table
 
-local pluginMeta = {
-	__index = function(o, k)
-		local v = rawget(o, k)
-		
-		if v == nil then
-			v = rawget(o, "public")[k]
-			if v == nil then
-				v = shared[k]
-			end
-		end
+local shared = setmetatable({}, {__index = _G})
 
-		return v
-	end
-}
+module "ircbot"
+
+local bot = _META
 
 local function readonly(t)
 	return setmetatable({}, {
@@ -38,51 +25,7 @@ local function readonly(t)
 	})
 end
 
-local function createPluginEnv(f, bot)
-	local p = {}
-	p.PLUGIN = p
-	p.CONFIG = readonly(bot.config)
-	function p.Command(name)
-		return function(tbl)
-			tbl.Plugin = p
-			return cmd.RegisterCommand(name)(tbl)
-		end
-	end
-
-	p.color, p.bold, p.underline = irc.color, irc.bold, irc.underline
-
-	p.environment = shared
-	p.public = {}
-	setfenv(f, p)
-	
-	return setmetatable(p, pluginMeta)
-end
-
-function bot:loadPlugin(path)
-	local function raise(message)
-		return nil, table.concat{"Error loading \"", path, "\": ", message}
-	end
-	
-	local f, err = loadfile(path)
-	if not f then
-		return nil, err
-	end
-
-	local plugin = createPluginEnv(f, self)
-	
-	local succ, err = pcall(f)
-	if not succ then
-		return nil, err
-	end
-
-	if not plugin.Name then
-		return raise("Plugin name not specified")
-	end
-
-	return plugin
-end
-
-function bot:loadPlugins(dir)
+function bot:unloadPlugins()
 	local plugins = self.plugins
 	
 	for k, plugin in ipairs(plugins) do
@@ -90,6 +33,8 @@ function bot:loadPlugins(dir)
 		if unload then
 			unload()
 		end
+		
+		shared[plugin.ModuleName] = nil
 		plugins[k] = nil
 	end
 
@@ -97,6 +42,68 @@ function bot:loadPlugins(dir)
 	for k = 1,#thinks do
 		thinks[k] = nil
 	end
+end
+
+function bot:loadPlugin(path)
+	local modname = path:match("/(.-).lua$")
+	local function raise(message)
+		return nil, table.concat{"Error loading plugin \"", modname, "\": ", message}
+	end
+	
+	local f, err = loadfile(path)
+	if not f then 
+		return raise(err)
+	end
+
+	local p = {
+		color = irc.color;
+		bold = irc.bold;
+		underline = irc.underline;
+
+		CONFIG = readonly(self.config);
+		public = {};
+		
+		ModuleName = modname;
+		Path = path;
+	}
+	p.PLUGIN = p
+	setmetatable(p, {__index = shared})
+	shared[modname] = p.public
+
+	if self:hasCommandSystem() then
+		self:initCommandSystem(p)
+	end
+	
+	setfenv(f, p)
+	
+	local succ, err = pcall(f)
+	if not succ then
+		return raise(err)
+	end
+
+	if not p.Name then
+		return raise("Plugin name not specified")
+	end
+
+	p.CommandPrefix = p.CommandPrefix or "!"
+
+	local load = p.Load
+	if load then
+		load(self)
+	end
+
+	local think = p.Think
+	if think then
+		table.insert(self.thinks, think)
+	end
+
+	return p
+end
+
+function bot:loadPluginsFolder(dir)
+	self:unloadPlugins()
+
+	local plugins = self.plugins
 	
 	for path in lfs.dir(dir) do
 		if path:match("%.lua$") then
@@ -106,24 +113,8 @@ function bot:loadPlugins(dir)
 				return nil, err
 			end
 
-			local load = plugin.Load
-			if load then
-				load(self)
-			end
-
-			local think = plugin.Think
-			if think then
-				table.insert(thinks, think)
-			end
-
-			plugin.Path = path
-			plugin.ModuleName = path:match("^(.-).lua")
 			table.insert(plugins, plugin)
 		end
-	end
-
-	for k,plugin in ipairs(plugins) do
-		shared[plugin.ModuleName] = plugin.public
 	end
 
 	return plugins

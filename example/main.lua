@@ -3,7 +3,7 @@ local sleep = require "socket".sleep
 
 local bot, config = ircbot.new("config.lua")
 
-assert(bot:loadPlugins(config.plugindir))
+assert(bot:loadPluginsFolder(config.plugin_dir))
 
 while true do
 	bot:think()

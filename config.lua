@@ -1,14 +1,9 @@
-local table = table
-local string = string
-local tonumber = tonumber
-local tostring = tostring
 local pcall = pcall
-local error = error
 local setfenv = setfenv
 local ipairs = ipairs
 local loadfile = loadfile
 
-module(...)
+module "ircbot"
 
 local function tableField(tbl, name)
 	tbl[name] = function(t)
@@ -16,11 +11,11 @@ local function tableField(tbl, name)
 	end
 end
 
-function load(path, tableFields)	
+function loadConfigTable(path, tableFields)
 	local f, err = loadfile(path)
-	if not f then error(err, 2) end
+	if not f then return nil, err end
 
-	local config = {table = table, string = string, tonumber = tonumber, tostring = tostring}
+	local config = {}
 
 	if tableFields then
 		for k, field in ipairs(tableFields) do
@@ -31,7 +26,7 @@ function load(path, tableFields)
 	setfenv(f, config)
 
 	f, err = pcall(f)
-	if not f then error(err, 2) end
+	if not f then return nil, err end
 	
 	return config
 end

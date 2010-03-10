@@ -1,5 +1,4 @@
-local irc = require "irc"
-local lfs = require "lfs"
+local irc, lfs = require "irc", require "lfs"
 
 local rawget = rawget
 local assert = assert
@@ -8,75 +7,61 @@ local loadfile = loadfile
 local setfenv = setfenv
 local type = type
 local setmetatable = setmetatable
+local require = require
+local rawget = rawget
 
-local conf = require "ircbot.config"
-local cmd = require "ircbot.command"
+module "ircbot"
 
 local bot = {}
-do
-	local temp = _BOT
-	_BOT = bot
-	require "ircbot.plugin"
-	_BOT = temp
-end
+_META = bot
 
-module(...)
-
-function bot.__index(o, k)
-	local v = rawget(bot, k)
-
-	if v == nil then
-		v = rawget(o, k)
-	end
-
-	if v == nil then
-		local irc = rawget(o, "conn")
-		v = irc[k]
-	end
-
-	return v
-end
+require "ircbot.plugin"
+require "ircbot.config"
+require "ircbot.command"
+require "ircbot.admin"
 
 function new(tbl)
 	if type(tbl) == "string" then
-		tbl = conf.load(tbl, {"channels"})
+		tbl = assert(loadConfigTable(tbl, {"channels"}))
 	end
 	
 	local conn = irc.new(tbl)
 
-	local authed = false
-	conn:hook("OnConnect", function()
-		authed = true
-	end)
-
-	local succ, err = conn:connect(assert(tbl.server, "Field 'server' is required"), tbl.port)
-	if not succ then
-		error(err, 2)
-	end
-
-	repeat
-		conn:think()
-	until authed
+	conn:connect(assert(tbl.server, "Field 'server' is required"), tbl.port)
 
 	if tbl.channels then
 		for k,channel in ipairs(tbl.channels) do
 			if type(channel) == "table" then
 				conn:join(assert(channel.name, "Malformed channel object"), channel.key)
-			else 
+			else
 				conn:join(channel)
 			end
 		end
 	end
 
-	conn:hook("OnChat", "_commandparser", function(user, channel, msg)
-		cmd.OnChat(conn, user, channel, msg)
-	end)
+	local b = {
+		conn = conn;
+		config = tbl;
+		plugins = {};
+		thinks = {};
+	}
 	
-	return setmetatable({conn = conn; 
-						config = tbl; 
-						plugins = {};
-						thinks = {};
-						}, bot), tbl
+	setmetatable(b, {__index = function(o,k)
+		local v = rawget(o,k)
+		if v == nil then
+			v = bot[k]
+			if v == nil then
+				v = conn[k]
+			end
+		end
+		return v
+	end})
+
+	if b:hasAdminSystem() then
+		b:initAdminSystem()
+	end
+	
+	return b, tbl
 end
 
 function bot:think()

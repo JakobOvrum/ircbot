@@ -2,107 +2,115 @@ local error = error
 local table = table
 local type = type
 local select = select
-local xpcall = xpcall
+local pcall = pcall
 local unpack = unpack
+local assert = assert
+local setmetatable = setmetatable
+local setfenv = setfenv
 
-local print = print
+module "ircbot"
 
-module(...)
+local bot = _META
 
-local function assert(a, err)
-	if not a then
-		error(err, 3)
-	end
-	return a
-end
+local argHandlers = {
+	string = function(expected, args)
+		local t = {args:match(expected)}
+		if #t == 0 then
+			return nil, "invalid argument format"
+		end
+		return t
+	end;
 
-local commands = {}
-
-function RegisterCommand(name)
-	return function(tbl)
-		name = name or tbl.Name
-		
-		local f = tbl[1]
-		assert(type(f) == "function", "Callback is not a function")
-		local cmd = {
-			name = assert(name, "Command name not specified");
-			cb = f;
-			args = tbl.ExpectedArgs;
-			plugin = tbl.Plugin;
-		}
-		commands[name] = cmd
-	end
-end
-
-CommandPrefix = "!"
-
-local function errorHandler(err)
-	return err
-end
-
---in serious need of cleanup
-function OnChat(s, user, channel, msg)
-	local cmdname = msg:match(table.concat{"^", CommandPrefix, "(%S+)"})
-	if not cmdname then return end
-
-	local cmd = commands[cmdname]
-	if not cmd then return end
-
-	local function raise(msg)
-		s:sendChat(channel, table.concat{"Error running command \"", cmdname, "\": ", msg})
-	end
-
-	local args = msg:match(".- (.+)$")
-	local expectedArgs = cmd.args
-	
-	if type(expectedArgs) == "string" then
+	number = function(expected, args)
 		if not args then
-			return raise("bad argument format")
+			return nil, "arguments expected"
 		end
-		
-		local argstbl = {args:match(expectedArgs)}
-		if #argstbl == 0 then
-			return raise("bad argument format")
+		local t = {}
+		args:gsub("(%S*)", function(word) table.insert(t, word) end)
+
+		if #t > -1 and #t < expected then
+			return nil, ("got %d arguments, expected %d"):format(#t, expected)
 		end
+		return t
+	end;
+}
 
-		args = argstbl
-		
-	elseif type(expectedArgs) == "number" then
-		if not args then
-			return raise("Arguments expected, got none")
-		end
-		
-		local argstbl = {}
-		args:gsub("(%S+)", function(a) table.insert(argstbl, a) end)
-
-		local n = #argstbl
-		if expectedArgs >= 0 and n < expectedArgs then
-			return raise(table.concat{expectedArgs, " arguments expected, got ", n})
-		end
-
-		args = argstbl
-	end
-
-	function cmd.plugin.reply(msg, ...)
-		msg = msg:format(...)
-		s:sendChat(channel, msg)
-	end
-
-	local env = cmd.plugin.environment
-	env.channel = channel
-	env.user = user
+function bot:RegisterCommand(plugin, name, tbl)
+	tbl.Callback = assert(tbl.Callback or tbl[1], "Callback not specified")
+	local f = tbl.Callback
 	
-	local f = function()
+	assert(type(f) == "function", "Callback is not a function")
+	tbl.Name = assert(tbl.Name or name, "Command name not specified")
+
+	if tbl.ExpectedArgs then
+		tbl.ArgParser = assert(argHandlers[type(tbl.ExpectedArgs)], "ExpectedArgs is of unsupported type")
+	end
+	
+	setmetatable(tbl, {__index = plugin})
+	setfenv(f, tbl)
+	self.commands[tbl.Name] = tbl
+end
+
+function bot:hasCommandSystem()
+	return not self.config.no_command_system
+end
+
+function bot:initCommandSystem(plugin)
+	self.commands = self.commands or {}
+	local commands = self.commands
+	
+	plugin.Command = function(name)
+		return function(tbl)
+			self:RegisterCommand(plugin, name, tbl)
+		end
+	end
+	
+	self:hook("OnChat", "_cmdhandler", function(user, channel, msg)
+		local cmdPrefix = plugin.CommandPrefix
+		local cmdname = msg:match(table.concat{"^", cmdPrefix, "(.+)%s*"})
+		if not cmdname then return end
+
+		local cmd = commands[cmdname]
+		if not cmd then
+			self:invoke("UnknownCommand", user, channel, cmdname)
+			return
+		end
+
+		if cmd.admin and not self:isAdmin(user) then
+			return
+		end
+
+		local function raise(err)
+			local redirect = self.config.redirect_errors
+			if type(redirect) == true then return end
+			self:sendChat(type(redirect) == "string" and redirect or channel, ("Error in command \"%s\": %s"):format(cmdname, err))
+		end
+		
+		local args = msg:match("^(.-) (.+)$")
+
+		local argParser = cmd.ArgParser
+		if argParser then
+			local parsed, err = argParser(cmd.ExpectedArgs, args)
+			if not parsed then
+				return raise(err)
+			end
+			args = parsed
+		end
+		
+		cmd.user, cmd.channel = user, channel
+		cmd.reply = function(fmt, ...)
+			self:sendChat(channel, fmt:format(...))
+		end
+
+		local succ, err
 		if type(args) == "table" then
-			cmd.cb(unpack(args))
+			succ, err = pcall(cmd.Callback, unpack(args))
 		else
-			cmd.cb(args)
+			succ, err = pcall(cmd.Callback, args)
 		end
-	end
-	
-	local succ, err = xpcall(f, errorHandler)
-	
-	if not succ then
-		raise(err)
-	end
+		
+		if not succ then
+			return raise(err)
+		end
+	end)
 end
