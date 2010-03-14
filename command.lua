@@ -55,6 +55,10 @@ function bot:hasCommandSystem()
 	return not self.config.no_command_system
 end
 
+function bot:flushCommands()
+	self.commands = {}
+end
+
 function bot:initCommandSystem(plugin)
 	self.commands = self.commands or {}
 	local commands = self.commands
@@ -67,9 +71,9 @@ function bot:initCommandSystem(plugin)
 	
 	self:hook("OnChat", "_cmdhandler", function(user, channel, msg)
 		local cmdPrefix = plugin.CommandPrefix
-		local cmdname = msg:match(table.concat{"^", cmdPrefix, "(.+)%s*"})
+		local cmdname = msg:match(table.concat{"^", cmdPrefix, "(%S+)"})
 		if not cmdname then return end
-
+		
 		local cmd = commands[cmdname]
 		if not cmd then
 			self:invoke("UnknownCommand", user, channel, cmdname)
@@ -82,14 +86,14 @@ function bot:initCommandSystem(plugin)
 
 		local function raise(err)
 			local redirect = self.config.redirect_errors
-			if type(redirect) == true then return end
+			if redirect == true then return end
 			self:sendChat(type(redirect) == "string" and redirect or channel, ("Error in command \"%s\": %s"):format(cmdname, err))
 		end
 		
-		local args = msg:match("^(.-) (.+)$")
+		local args = msg:match("^%S+ (.+)$")
 
 		local argParser = cmd.ArgParser
-		if argParser then
+		if argParser and args then
 			local parsed, err = argParser(cmd.ExpectedArgs, args)
 			if not parsed then
 				return raise(err)

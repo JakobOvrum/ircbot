@@ -42,6 +42,10 @@ function bot:unloadPlugins()
 	for k = 1,#thinks do
 		thinks[k] = nil
 	end
+
+	if self:hasCommandSystem() then
+		self:flushCommands()
+	end
 end
 
 function bot:loadPlugin(path)
