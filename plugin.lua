@@ -4,12 +4,15 @@ local irc = require "irc"
 local setmetatable = setmetatable
 local error = error
 local setfenv = setfenv
+local getfenv = getfenv
 local loadfile = loadfile
 local pcall = pcall
 local pairs = pairs
 local ipairs = ipairs
 local table = table
 local type = type
+local assert = assert
+local print = print
 
 local shared = setmetatable({}, {__index = _G})
 
@@ -34,6 +37,10 @@ function bot:unloadPlugins()
 		if unload then
 			unload()
 		end
+
+		for k, h in ipairs(plugin._hooks) do
+			self:unhook(h.type, h.id)
+		end
 		
 		shared[plugin.ModuleName] = nil
 		plugins[k] = nil
@@ -50,7 +57,7 @@ function bot:unloadPlugins()
 end
 
 function bot:loadPlugin(path)
-	local modname = path:match("/(.-).lua$")
+	local modname = path:match("/(.-)%.lua$")
 	local function raise(message)
 		return nil, table.concat{"Error loading plugin \"", modname, "\": ", message}
 	end
@@ -64,17 +71,21 @@ function bot:loadPlugin(path)
 		color = irc.color;
 		bold = irc.bold;
 		underline = irc.underline;
+		channels = self.channels;
 
 		CONFIG = readonly(self.config);
 		public = {};
 		
 		ModuleName = modname;
 		Path = path;
+
+		_hooks = {};
 	}
 	p.PLUGIN = p
 	setmetatable(p, {__index = shared})
 	shared[modname] = p.public
 
+	--add Command function
 	if self:hasCommandSystem() then
 		p.Command = function(name)
 			local names = {name}
@@ -89,6 +100,36 @@ function bot:loadPlugin(path)
 			end
 
 			return reg
+		end
+	end
+
+	--add Hook function
+	function p.Hook(hook)
+		return function(tbl)
+			local f = assert(tbl.callback or tbl[1], "callback not provided")
+			assert(type(f) == "function", "callback not a function value")
+
+			tbl.self = self
+			setmetatable(tbl, {__index = p})
+			setfenv(f, tbl)
+
+			local hookInfo = {type = hook}
+			table.insert(p._hooks, hookInfo)
+			hookInfo.id = self:hook(hook, function(...)
+				local succ, err = pcall(f, ...)
+				if not succ then
+					print(("Error running hook \"%s\": %s"):format(hook, err))
+				end
+			end)
+		end
+	end
+
+	--add send function
+	function p.send(info)
+		if info.method == "notice" then
+			self:sendNotice(info.target, info.message)
+		else
+			self:sendChat(info.target, info.message)
 		end
 	end
 	

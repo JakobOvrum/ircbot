@@ -38,8 +38,10 @@ local argHandlers = {
 }
 
 function bot:RegisterCommand(plugin, names, tbl)
-	tbl.Callback = assert(tbl.Callback or tbl[1], "callback not specified")
-	local f = tbl.Callback
+	tbl.callback = assert(tbl.callback or tbl[1], "callback not specified")
+	local f = tbl.callback
+
+	tbl.admin = not not tbl.admin
 	
 	assert(type(f) == "function", "callback is not a function")
 
@@ -95,7 +97,7 @@ function bot:initCommandSystem()
 			return
 		end
 
-		if cmd.admin and not self:isAdmin(user) then
+		if cmd.admin == true and not self:isAdmin(user) then
 			local ignore = config.ignore_lackofadmin_warnings
 			if not ignore then
 				report(user, channel, "run admin-only command "..cmdname)
@@ -132,9 +134,9 @@ function bot:initCommandSystem()
 
 		local succ, err
 		if type(args) == "table" then
-			succ, err = pcall(cmd.Callback, unpack(args))
+			succ, err = pcall(cmd.callback, unpack(args))
 		else
-			succ, err = pcall(cmd.Callback, args)
+			succ, err = pcall(cmd.callback, args)
 		end
 		
 		if not succ and err ~= abort_uid then
