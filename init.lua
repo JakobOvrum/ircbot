@@ -3,12 +3,14 @@ local irc, lfs = require "irc", require "lfs"
 local rawget = rawget
 local assert = assert
 local ipairs = ipairs
-local loadfile = loadfile
 local setfenv = setfenv
 local type = type
 local setmetatable = setmetatable
 local require = require
-local rawget = rawget
+local print = print
+local date = os.date
+
+local _G = _G
 
 module "ircbot"
 
@@ -22,17 +24,23 @@ require "ircbot.admin"
 
 function new(tbl)
 	if type(tbl) == "string" then
-		tbl = assert(loadConfigTable(tbl, {"channels"}))
+		tbl = assert(loadConfigTable(tbl, {"channels", "admins"}))
 	end
 	
 	local conn = irc.new(tbl)
 
-	conn:connect(assert(tbl.server, "Field 'server' is required"), tbl.port)
+	conn:connect(assert(tbl.server, "field 'server' is required"), tbl.port)
+
+	local on_connect = tbl.on_connect
+	if on_connect then
+		setfenv(on_connect, _G)
+		on_connect(conn)
+	end
 
 	if tbl.channels then
 		for k,channel in ipairs(tbl.channels) do
 			if type(channel) == "table" then
-				conn:join(assert(channel.name, "Malformed channel object"), channel.key)
+				conn:join(assert(channel.name, "malformed channel object"), channel.key)
 			else
 				conn:join(channel)
 			end
@@ -44,6 +52,9 @@ function new(tbl)
 		config = tbl;
 		plugins = {};
 		thinks = {};
+		logger = function(message)
+			print(("[%s] %s"):format(date(), message))
+		end;
 	}
 	
 	setmetatable(b, {__index = function(o,k)
@@ -57,6 +68,10 @@ function new(tbl)
 		return v
 	end})
 
+	if b:hasCommandSystem() then
+		b:initCommandSystem()
+	end
+	
 	if b:hasAdminSystem() then
 		b:initAdminSystem()
 	end
@@ -70,4 +85,8 @@ function bot:think()
 	end
 	
 	self.conn:think()
+end
+
+function bot:log(message)
+	self.logger(message)
 end

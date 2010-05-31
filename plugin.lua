@@ -9,6 +9,7 @@ local pcall = pcall
 local pairs = pairs
 local ipairs = ipairs
 local table = table
+local type = type
 
 local shared = setmetatable({}, {__index = _G})
 
@@ -75,7 +76,20 @@ function bot:loadPlugin(path)
 	shared[modname] = p.public
 
 	if self:hasCommandSystem() then
-		self:initCommandSystem(p)
+		p.Command = function(name)
+			local names = {name}
+
+			local function reg(tbl)
+				if type(tbl) == "string" then
+					table.insert(names, tbl)
+					return reg
+				else
+					self:RegisterCommand(p, names, tbl)
+				end
+			end
+
+			return reg
+		end
 	end
 	
 	setfenv(f, p)

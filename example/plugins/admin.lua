@@ -4,8 +4,6 @@
 
 PLUGIN.Name = "Administration"
 
-local conf = require "ircbot.config"
-
 local BOT
 
 function Load(bot)
@@ -14,9 +12,7 @@ end
 
 --bot administration
 Command "login"
-{
-	ExpectedArgs = 1;
-	
+{	
 	function(password)
 		if CONFIG.password and CONFIG.password == password then
 			reply("Welcome, %s", user.nick)
@@ -35,7 +31,7 @@ Command "reload"
 	end
 }
 
-Command "quit"
+Command "quit" "exit"
 {
 	admin = true;
 	
@@ -65,5 +61,16 @@ Command "part"
 	function(channel)
 		BOT:part(channel)
 		reply("Left %s", channel)
+	end
+}
+
+Command "pm" "send"
+{
+	expectedArgs = "^(%S+) (.+)$";
+	admin = true;
+
+	function(target, message)
+		BOT:sendChat(target, message)
+		reply("Sent \"%s\" to \"%s\"", message, target)
 	end
 }

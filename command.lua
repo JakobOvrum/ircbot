@@ -7,6 +7,8 @@ local unpack = unpack
 local assert = assert
 local setmetatable = setmetatable
 local setfenv = setfenv
+local print = print
+local ipairs = ipairs
 
 module "ircbot"
 
@@ -26,7 +28,7 @@ local argHandlers = {
 			return nil, "arguments expected"
 		end
 		local t = {}
-		args:gsub("(%S*)", function(word) table.insert(t, word) end)
+		args:gsub("(%S+)", function(word) table.insert(t, word) end)
 
 		if #t > -1 and #t < expected then
 			return nil, ("got %d arguments, expected %d"):format(#t, expected)
@@ -35,20 +37,23 @@ local argHandlers = {
 	end;
 }
 
-function bot:RegisterCommand(plugin, name, tbl)
-	tbl.Callback = assert(tbl.Callback or tbl[1], "Callback not specified")
+function bot:RegisterCommand(plugin, names, tbl)
+	tbl.Callback = assert(tbl.Callback or tbl[1], "callback not specified")
 	local f = tbl.Callback
 	
-	assert(type(f) == "function", "Callback is not a function")
-	tbl.Name = assert(tbl.Name or name, "Command name not specified")
+	assert(type(f) == "function", "callback is not a function")
 
-	if tbl.ExpectedArgs then
-		tbl.ArgParser = assert(argHandlers[type(tbl.ExpectedArgs)], "ExpectedArgs is of unsupported type")
+	if tbl.expectedArgs then
+		tbl.ArgParser = assert(argHandlers[type(tbl.expectedArgs)], "\"expectedArgs\" is of unsupported type")
 	end
 	
 	setmetatable(tbl, {__index = plugin})
 	setfenv(f, tbl)
-	self.commands[tbl.Name] = tbl
+
+	for k,name in ipairs(names) do
+		assert(not name:find(" "), "command name can not contain spaces")
+		self.commands[name] = tbl
+	end
 end
 
 function bot:hasCommandSystem()
@@ -56,36 +61,50 @@ function bot:hasCommandSystem()
 end
 
 function bot:flushCommands()
-	self.commands = {}
+	local cmds = self.commands
+	for k,v in ipairs(cmds) do cmds[k] = nil end
 end
 
-function bot:initCommandSystem(plugin)
-	self.commands = self.commands or {}
-	local commands = self.commands
-	
-	plugin.Command = function(name)
-		return function(tbl)
-			self:RegisterCommand(plugin, name, tbl)
-		end
+CommandPrefix = "!"
+function commandPrefix(new)
+	local cmdPrefix = CommandPrefix
+	CommandPrefix = new or cmdPrefix
+	return cmdPrefix
+end
+
+function bot:initCommandSystem()
+	local commands = {}
+	local abort_uid = {}
+	self.commands = commands
+
+	local config = self.config
+	local function report(user, channel, action)
+		self:log(("user '%s@%s' tried to %s (in %s)"):format(user.nick, user.host, action, channel))
 	end
 	
 	self:hook("OnChat", "_cmdhandler", function(user, channel, msg)
-		local cmdPrefix = plugin.CommandPrefix
-		local cmdname = msg:match(table.concat{"^", cmdPrefix, "(%S+)"})
+		local cmdname = msg:match(table.concat{"^", CommandPrefix, "(%S+)"})
 		if not cmdname then return end
 		
 		local cmd = commands[cmdname]
 		if not cmd then
-			self:invoke("UnknownCommand", user, channel, cmdname)
+			local ignore = self.config.ignore_unknowncommand_warnings
+			if not ignore then
+				report(user, channel, "run unrecognized command "..cmdname)
+			end
 			return
 		end
 
 		if cmd.admin and not self:isAdmin(user) then
+			local ignore = config.ignore_lackofadmin_warnings
+			if not ignore then
+				report(user, channel, "run admin-only command "..cmdname)
+			end
 			return
 		end
 
 		local function raise(err)
-			local redirect = self.config.redirect_errors
+			local redirect = config.redirect_errors
 			if redirect == true then return end
 			self:sendChat(type(redirect) == "string" and redirect or channel, ("Error in command \"%s\": %s"):format(cmdname, err))
 		end
@@ -94,7 +113,7 @@ function bot:initCommandSystem(plugin)
 
 		local argParser = cmd.ArgParser
 		if argParser and args then
-			local parsed, err = argParser(cmd.ExpectedArgs, args)
+			local parsed, err = argParser(cmd.expectedArgs, args)
 			if not parsed then
 				return raise(err)
 			end
@@ -103,7 +122,12 @@ function bot:initCommandSystem(plugin)
 		
 		cmd.user, cmd.channel = user, channel
 		cmd.reply = function(fmt, ...)
-			self:sendChat(channel, fmt:format(...))
+			self:sendChat(config.nick == channel and user.nick or channel, fmt:format(...))
+		end
+		
+		cmd.raise = function(...)
+			reply(...)
+			error(abort_uid)
 		end
 
 		local succ, err
@@ -113,7 +137,7 @@ function bot:initCommandSystem(plugin)
 			succ, err = pcall(cmd.Callback, args)
 		end
 		
-		if not succ then
+		if not succ and err ~= abort_uid then
 			return raise(err)
 		end
 	end)
