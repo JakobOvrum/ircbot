@@ -41,7 +41,7 @@ Command "passthree"
 	end
 }
 
---Admin-only command with three alias with an IRC formatted response
+--Admin-only command with three alias' and an IRC formatted response
 Command "secret" "very-secret" "super-secret"
 {
 	admin = true;
