@@ -126,10 +126,13 @@ function bot:loadPlugin(path)
 
 	--add send function
 	function p.send(info)
+		local target = assert(info.target, "missing target")
+		local message = assert(info.message, "missing message")
+		
 		if info.method == "notice" then
-			self:sendNotice(info.target, info.message)
+			self:sendNotice(target, message)
 		else
-			self:sendChat(info.target, info.message)
+			self:sendChat(target, message)
 		end
 	end
 	
