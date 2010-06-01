@@ -40,3 +40,14 @@ Command "passthree"
 		reply("You gave me %s, %s and %s.", one, two, three)
 	end
 }
+
+--Admin-only command with three alias with an IRC formatted response
+Command "secret" "very-secret" "super-secret"
+{
+	admin = true;
+
+	function()
+		reply("%s! This is %s!", color(user.nick, "blue"), bold(underline("top-secret")))
+	end
+}
+
