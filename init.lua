@@ -79,11 +79,16 @@ function new(tbl)
 	return b, tbl
 end
 
+function bot:close(message)
+	self:unloadPlugins()
+	self.conn:disconnect(message)
+end
+
 function bot:think()
 	for k, think in ipairs(self.thinks) do
 		think()
 	end
-	
+
 	self.conn:think()
 end
 

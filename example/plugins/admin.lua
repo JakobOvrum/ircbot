@@ -36,7 +36,7 @@ Command "quit" "exit"
 	admin = true;
 	
 	function(message)
-		BOT:disconnect(message)
+		BOT:close(message)
 		os.exit()
 	end
 }
