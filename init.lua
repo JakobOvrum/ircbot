@@ -9,6 +9,7 @@ local setmetatable = setmetatable
 local require = require
 local print = print
 local date = os.date
+local pcall = pcall
 
 local _G = _G
 
@@ -86,7 +87,10 @@ end
 
 function bot:think()
 	for k, think in ipairs(self.thinks) do
-		think()
+		local succ, err = pcall(think)
+		if not succ then
+			print("Error in Think: "..err)
+		end
 	end
 
 	self.conn:think()
