@@ -8,6 +8,6 @@ To create a new bot, you can copy the included example/, edit config.lua then ad
 
 The admin.lua plugin is included for commonly used administrative tasks, but isn't necessary.
 
-This project depends on http://github.com/JakobOvrum/LuaIRC, which in turn requires LuaSocket.
+This project depends on LuaFileSystem and LuaIRC (http://github.com/JakobOvrum/LuaIRC), which in turn requires LuaSocket.
 
 -jA_cOp
