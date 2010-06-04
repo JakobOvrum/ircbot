@@ -13,6 +13,7 @@ local table = table
 local type = type
 local assert = assert
 local print = print
+local rawget = rawget
 
 local shared = setmetatable({}, {__index = _G})
 
@@ -20,11 +21,17 @@ module "ircbot"
 
 local bot = _META
 
-local function readonly(t)
+local function configProxy(t)
 	return setmetatable({}, {
-		__index = t;
+		__index = function(proxy, k)
+			local v = t[k]
+			if v == nil then
+				error(table.concat{"Requested nil config value \"",k,"\""}, 2)
+			end
+			return v
+		end;
 		__newindex = function()
-			error("Table is read-only", 2)
+			error("Config table is read-only", 2)
 		end;
 	})
 end
@@ -73,7 +80,7 @@ function bot:loadPlugin(path)
 		underline = irc.underline;
 		channels = self.channels;
 
-		CONFIG = readonly(self.config);
+		CONFIG = configProxy(self.config);
 		public = {};
 		
 		ModuleName = modname;
