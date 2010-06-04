@@ -111,6 +111,15 @@ function bot:loadPlugin(path)
 	end
 
 	--add Hook function
+	local specialHooks = {
+		Think = function(f)
+			if p.Think then
+				error("There can only be one Think hook per plugin", 3)
+			end
+			p.Think = f
+		end
+	}
+	
 	function p.Hook(hook)
 		return function(tbl)
 			local f = assert(tbl.callback or tbl[1], "callback not provided")
@@ -119,6 +128,12 @@ function bot:loadPlugin(path)
 			tbl.self = self
 			setmetatable(tbl, {__index = p})
 			setfenv(f, tbl)
+
+			local specialHook = specialHooks[hook]
+			if specialHook then
+				specialHook(f)
+				return
+			end
 
 			local hookInfo = {type = hook}
 			table.insert(p._hooks, hookInfo)
