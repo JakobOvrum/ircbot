@@ -3,6 +3,9 @@ local setfenv = setfenv
 local ipairs = ipairs
 local loadfile = loadfile
 
+-- reference to IRC module
+local irc = irc
+
 module "ircbot"
 
 local function tableField(tbl, name)
@@ -15,7 +18,8 @@ function loadConfigTable(path, tableFields)
 	local f, err = loadfile(path)
 	if not f then return nil, err end
 
-	local config = {}
+	-- Make the bold, underline, color, etc functions available for config msgs
+	local config = {bold = irc.bold, underline = irc.underline, color = irc.color}
 
 	if tableFields then
 		for k, field in ipairs(tableFields) do
