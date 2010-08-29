@@ -13,7 +13,7 @@ Command "tell"
     telldb[usernick] = telldb[usernick] or {}
     local t = telldb[usernick]
     t[#t+1] = {user.nick, message}
-    reply("Ok, note taken")
+    reply("%s: Ok, got it.", user.nick)
   end
 }
 
