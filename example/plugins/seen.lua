@@ -3,7 +3,16 @@
 ]]
 
 PLUGIN.Name = "Last seen"
-local time,seendb = os.time,false
+local time,seendb = os.time
+
+function PostLoad()
+  if data then
+    data.seen = data.seen or {}
+    seendb = data.seen
+  else
+    error("this plugin depends on the data plugin")
+  end
+end
 
 Hook "OnChat"
 {
@@ -28,18 +37,6 @@ Command "seen"
 		if not u then
 			return reply("I haven't seen "..usernick.." around.")
 		end
-		reply(("I last saw %s %s %s around %s"):format(usernick, (u[1] == "m" and "say something in") or "join", u[2], os.date("%c", u[3])))
-	end
-}
-
-Hook "Think"
-{
-	function()
-		if not seendb then
-			if data then
-				data.seen = data.seen or {}
-				seendb = data.seen
-			end
-		end
+		reply("I last saw %s %s %s around %s", usernick, (u[1] == "m" and "say something in") or "join", u[2], os.date("%c", u[3]))
 	end
 }

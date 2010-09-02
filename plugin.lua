@@ -38,7 +38,7 @@ end
 
 function bot:unloadPlugins()
 	local plugins = self.plugins
-	
+
 	for k, plugin in ipairs(plugins) do
 		local unload = plugin.Unload
 		if unload then
@@ -48,7 +48,7 @@ function bot:unloadPlugins()
 		for k, h in ipairs(plugin._hooks) do
 			self:unhook(h.type, h.id)
 		end
-		
+
 		shared[plugin.ModuleName] = nil
 		plugins[k] = nil
 	end
@@ -68,9 +68,9 @@ function bot:loadPlugin(path)
 	local function raise(message)
 		return nil, table.concat{"Error loading plugin \"", modname, "\": ", message}
 	end
-	
+
 	local f, err = loadfile(path)
-	if not f then 
+	if not f then
 		return raise(err)
 	end
 
@@ -82,7 +82,7 @@ function bot:loadPlugin(path)
 
 		CONFIG = configProxy(self.config);
 		public = {};
-		
+
 		ModuleName = modname;
 		Path = path;
 
@@ -119,7 +119,7 @@ function bot:loadPlugin(path)
 			p.Think = f
 		end
 	}
-	
+
 	function p.Hook(hook)
 		return function(tbl)
 			local f = assert(tbl.callback or tbl[1], "callback not provided")
@@ -150,16 +150,16 @@ function bot:loadPlugin(path)
 	function p.send(info)
 		local target = assert(info.target, "missing target")
 		local message = assert(info.message, "missing message")
-		
+
 		if info.method == "notice" then
 			self:sendNotice(target, message)
 		else
 			self:sendChat(target, message)
 		end
 	end
-	
+
 	setfenv(f, p)
-	
+
 	local succ, err = pcall(f)
 	if not succ then
 		return raise(err)
@@ -188,11 +188,11 @@ function bot:loadPluginsFolder(dir)
 	self:unloadPlugins()
 
 	local plugins = self.plugins
-	
+
 	for path in lfs.dir(dir) do
 		if path:match("%.lua$") then
 			local plugin, err = self:loadPlugin(dir.."/"..path)
-		
+
 			if not plugin then
 				return nil, err
 			end
@@ -200,6 +200,13 @@ function bot:loadPluginsFolder(dir)
 			table.insert(plugins, plugin)
 		end
 	end
+
+	for k, plugin in ipairs(plugins) do
+		local postload = plugin.PostLoad
+		if postload then
+			postload(self)
+		end
+  end
 
 	return plugins
 end

@@ -4,7 +4,7 @@
   note: this plugin requires luaSolidState which you can get from the following url:
     http://github.com/TheLinx/luaSolidState
 ]]
-require("state")
+local state = require("state")
 
 PLUGIN.Name = "Data Storage"
 
@@ -16,7 +16,8 @@ function Load()
 end
 
 function Unload()
-	state.store(cfg.name, public)
+  print("storing state")
+	print(state.store(cfg.name, public))
 end
 
 Hook "Think"

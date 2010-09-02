@@ -3,11 +3,20 @@
 ]]
 
 PLUGIN.Name = "Tell"
-local telldb = false
+local telldb = {}
+
+function PostLoad()
+  if data then
+    data.tell = data.tell or {}
+    telldb = data.tell
+  else
+    error("this plugin depends on the data plugin")
+  end
+end
 
 Command "tell"
 {
-  expectedArgs = "([%w%p]+) (.+)";
+  expectedArgs = "([^ ]+) (.+)";
 
   function (usernick, message)
     telldb[usernick] = telldb[usernick] or {}
@@ -38,16 +47,4 @@ Hook "OnJoin"
   function(...)
     return check(...)
   end
-}
-
-Hook "Think"
-{
-  function()
-		if not telldb then
-			if data then
-				data.tell = data.tell or {}
-				telldb = data.tell
-			end
-		end
-	end
 }
