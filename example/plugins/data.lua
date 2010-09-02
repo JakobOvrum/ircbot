@@ -16,8 +16,7 @@ function Load()
 end
 
 function Unload()
-  print("storing state")
-	print(state.store(cfg.name, public))
+	state.store(cfg.name, public)
 end
 
 Hook "Think"
