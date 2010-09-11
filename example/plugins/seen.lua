@@ -17,14 +17,14 @@ end
 Hook "OnChat"
 {
 	function(user, channel)
-		seendb[user.nick] = {"m", channel, time()}
+		seendb[user.nick:lower()] = {"m", channel, time()}
 	end
 }
 
 Hook "OnJoin"
 {
 	function(user, channel)
-		seendb[user.nick] = {"j", channel, time()}
+		seendb[user.nick:lower()] = {"j", channel, time()}
 	end
 }
 
@@ -33,7 +33,7 @@ Command "seen"
 	expectedArgs = 1;
 
 	function(usernick)
-		local u = seendb[usernick]
+		local u = seendb[usernick:lower()]
 		if not u then
 			return reply("I haven't seen "..usernick.." around.")
 		end

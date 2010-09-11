@@ -19,8 +19,8 @@ Command "tell"
   expectedArgs = "([^ ]+) (.+)";
 
   function (usernick, message)
-    telldb[usernick] = telldb[usernick] or {}
-    local t = telldb[usernick]
+    telldb[usernick:lower()] = telldb[usernick:lower()] or {}
+    local t = telldb[usernick:lower()]
     t[#t+1] = {user.nick, message}
     reply("%s: Ok, got it.", user.nick)
   end
@@ -28,11 +28,11 @@ Command "tell"
 
 local function check(user, channel)
   if telldb[user.nick] then
-    local t = telldb[user.nick]
+    local t = telldb[user.nick:lower()]
     for n=1,#t do
       send{target = channel, message = ("%s: %s left this message to you: '%s'"):format(user.nick, t[n][1], t[n][2])}
     end
-    telldb[user.nick] = nil
+    telldb[user.nick:lower()] = nil
   end
 end
 
