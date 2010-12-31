@@ -1,0 +1,5 @@
+---Plugin-oriented IRC bot framework for Lua.
+
+module "ircbot"
+
+
