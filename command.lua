@@ -10,6 +10,8 @@ local setfenv = setfenv
 local print = print
 local ipairs = ipairs
 
+local format = string.format
+
 module "ircbot"
 
 local bot = _META
@@ -126,7 +128,8 @@ function bot:initCommandSystem()
 		
 		cmd.user, cmd.channel = user, channel
 		cmd.reply = function(fmt, ...)
-			self:sendChat(config.nick == channel and user.nick or channel, fmt:format(...))
+			fmt = fmt or error("bad argument #1 to 'reply' (expected string, got "..type(fmt), 2)
+			self:sendChat(config.nick == channel and user.nick or channel, format(fmt, ...))
 		end
 		
 		cmd.raise = function(...)
