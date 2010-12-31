@@ -80,6 +80,7 @@ function bot:loadPlugin(path)
 		underline = irc.underline;
 		channels = self.channels;
 
+		loadConfigTable = loadConfigTable;
 		CONFIG = configProxy(self.config);
 		public = {};
 
