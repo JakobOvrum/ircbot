@@ -26,8 +26,20 @@ Command "reload"
 	admin = true;
 	
 	function(dir)
-		local succ, err = BOT:loadPluginsFolder(dir or CONFIG.plugin_dir)
-		reply(succ and "Reloaded plugins." or err)
+		--TODO: once commands stick after a single unload, don't reload default plugins
+		BOT:unloadPlugins()
+
+		local succ, err = BOT:loadDefaultPlugins()
+		if not succ then
+			reply(err)
+			return
+		end
+		succ, err = BOT:loadPluginsFolder(dir or CONFIG.plugin_dir)
+		if not succ then
+			reply(err)
+			return
+		end
+		reply("Reloaded plugins.")
 	end
 }
 

@@ -15,12 +15,15 @@ local assert = assert
 local rawget = rawget
 local wrap = coroutine.wrap
 local yield = coroutine.yield
-
-local shared = setmetatable({}, {__index = _G})
+local package = package
+local _G = _G
 
 module "ircbot"
 
 local bot = _META
+
+--- Shared plugin environment.
+shared = setmetatable({}, {__index = _G})
 
 -- This function creates a proxy object which ensures that a table is read-only and will error if a non-existant field was requested.
 local function configProxy(t)
@@ -38,41 +41,48 @@ local function configProxy(t)
 	})
 end
 
+function bot:unloadPlugin(i)
+	local plugin = self.plugins[i]
+	local unload = plugin.Unload
+	if unload then
+		unload()
+	end
+
+	for k, h in ipairs(plugin._hooks) do
+		self:unhook(h.type, h.id)
+	end
+
+	shared[plugin.ModuleName] = nil
+	self.plugins[i] = nil
+	if plugin.Think then
+		table.remove(self.thinks, plugin.thinkIndex)
+	end
+end
+
 --- Unload all plugins.
 -- If a plugin has an Unload function, it is called with no parameters.
 function bot:unloadPlugins()
 	local plugins = self.plugins
 
-	for k, plugin in ipairs(plugins) do
-		local unload = plugin.Unload
-		if unload then
-			unload()
-		end
-
-		for k, h in ipairs(plugin._hooks) do
-			self:unhook(h.type, h.id)
-		end
-
-		shared[plugin.ModuleName] = nil
-		plugins[k] = nil
+	for i = 1, #self.plugins do
+		self:unloadPlugin(i)
 	end
 
-	local thinks = self.thinks
-	for k = 1,#thinks do
-		thinks[k] = nil
-	end
-
+	-- TODO: move this to a per-plugin basis
 	if self:hasCommandSystem() then
 		self:flushCommands()
 	end
+
+	self:log("Unloaded all plugins")
 end
 
---- Load a plugin from file. The filename must end in ".lua".
+--- Load a plugin from file.
 -- @param path path to plugin script
+-- @returns the loaded plugin. On error, nil is returned followed by an error message.
 -- @note
 -- This method is not usually used directly; use bot:loadPluginsFolder instead.
 function bot:loadPlugin(path)
-	local modname = path:match("/(.-)%.lua$")
+	local modname = path:match("/(.-)%.lua$") or path
 	local function raise(message)
 		return nil, table.concat{"Error loading plugin \"", modname, "\": ", message}
 	end
@@ -205,16 +215,17 @@ function bot:loadPlugin(path)
 
 	local think = p.Think
 	if think then
-		table.insert(self.thinks, think)
+		local i = #self.thinks + 1
+		table.insert(self.thinks, i, think)
+		p.thinkIndex = i
 	end
 
 	return p
 end
 
+--- Load all plugins in a folder.
 function bot:loadPluginsFolder(dir)
-	self:unloadPlugins()
-
-	local plugins = self.plugins
+	local newPlugins = {}
 
 	for path in lfs.dir(dir) do
 		if path:match("%.lua$") then
@@ -224,16 +235,48 @@ function bot:loadPluginsFolder(dir)
 				return nil, err
 			end
 
-			table.insert(plugins, plugin)
+			self:log("Loaded plugin \"%s\"", path)
+
+			table.insert(newPlugins, plugin)
 		end
 	end
 
-	for k, plugin in ipairs(plugins) do
+	for k, plugin in ipairs(newPlugins) do
 		local postload = plugin.PostLoad
 		if postload then
 			postload(self)
 		end
-  end
+		table.insert(self.plugins, plugin) 
+  	end
 
-	return plugins
+	return newPlugins
+end
+
+local function exists(path)
+	return not not lfs.attributes(path)
+end
+
+--- Load plugins from the ircbot/plugins directory.
+-- ircbot is searched for in `package.path`.
+function bot:loadDefaultPlugins()
+	local libPath
+	for path in package.path:gmatch("[^;]+") do
+		path = path:gsub("%?", "ircbot")
+		if exists(path) then
+			libPath = path
+		end
+	end
+
+	local notFound = "unable to find ircbot directory"
+
+	if not libPath then
+		return false, notFound
+	end
+
+	libPath = libPath:match("^(.-)/[^/]+$")
+	if not libPath then
+		return false, notFound
+	end
+
+	return self:loadPluginsFolder(libPath .. "/plugins")	
 end
