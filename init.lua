@@ -109,7 +109,7 @@ function bot:think()
 	
 	local now = time()
 	for k, entry in ipairs(self.thinks) do
-		if entry.schedule <= now then
+		if entry.enabled and entry.schedule <= now then
 			local succ, result, arg = pcall(entry.think)
 			if not succ then
 				self:log("Error in Think: %s", result)
