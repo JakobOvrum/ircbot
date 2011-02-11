@@ -108,11 +108,12 @@ function bot:initCommandSystem()
 		end
 
 		local function raise(err)
+			local errorMessage = ("Error in command \"%s\": %s"):format(cmdname, err)
 			self:log("[%s] %s", channel, errorMessage)
 			local redirect = config.redirect_errors
-			if redirect == true then return end
-			local errorMessage = ("Error in command \"%s\": %s"):format(cmdname, err)
-			self:sendChat(type(redirect) == "string" and redirect or channel, errorMessage)
+			if redirect ~= true then
+				self:sendChat(type(redirect) == "string" and redirect or channel, errorMessage)
+			end
 		end
 		
 		local args = msg:match("^%S+ (.+)$")
