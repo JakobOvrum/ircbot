@@ -293,7 +293,7 @@ function bot:loadDefaultPlugins()
 		return false, notFound
 	end
 
-	libPath = libPath:match("^(.-)/[^/]+$")
+	libPath = libPath:match("^(.-)[/\\][^/\\]+$")
 	if not libPath then
 		return false, notFound
 	end
