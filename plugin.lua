@@ -12,7 +12,6 @@ local ipairs = ipairs
 local table = table
 local type = type
 local assert = assert
-local print = print
 local rawget = rawget
 local wrap = coroutine.wrap
 local yield = coroutine.yield
@@ -163,7 +162,7 @@ function bot:loadPlugin(path)
 			hookInfo.id = self:hook(hook, function(...)
 				local succ, err = pcall(f, ...)
 				if not succ then
-					print(("Error running hook \"%s\": %s"):format(hook, err))
+					self:log("Error running hook \"%s\": %s", hook, err)
 				end
 			end)
 		end
@@ -179,6 +178,11 @@ function bot:loadPlugin(path)
 		else
 			self:sendChat(target, message)
 		end
+	end
+
+	--add log function
+	function p.log(message, ...)
+		self:log(message, ...)
 	end
 
 	setfenv(f, p)

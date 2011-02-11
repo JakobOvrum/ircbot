@@ -36,23 +36,7 @@ function new(config)
 	local conn = irc.new(config)
 
 	conn:connect(assert(config.server, "field 'server' is required"), config.port)
-
-	local on_connect = config.on_connect
-	if on_connect then
-		setfenv(on_connect, _G)
-		on_connect(conn)
-	end
-
-	if config.channels then
-		for k, channel in ipairs(config.channels) do
-			if type(channel) == "table" then
-				conn:join(assert(channel.name, "malformed channel object"), channel.key)
-			else
-				conn:join(channel)
-			end
-		end
-	end
-
+	
 	local b = {
 		conn = conn;
 		config = config;
@@ -76,6 +60,24 @@ function new(config)
 			return value
 		end
 	})
+
+	b:log("Connected to %s", config.server)
+	
+	local on_connect = config.on_connect
+	if on_connect then
+		setfenv(on_connect, _G)
+		on_connect(b)
+	end
+
+	if config.channels then
+		for k, channel in ipairs(config.channels) do
+			if type(channel) == "table" then
+				conn:join(assert(channel.name, "malformed channel object"), channel.key)
+			else
+				conn:join(channel)
+			end
+		end
+	end
 
 	if b:hasCommandSystem() then
 		b:initCommandSystem()
@@ -106,7 +108,7 @@ function bot:think()
 		if entry.schedule <= now then
 			local succ, result, arg = pcall(entry.think)
 			if not succ then
-				print("Error in Think: " .. result)
+				self:log("Error in Think: %s", result)
 				fastremove(self.thinks, k)
 			elseif result then
 				entry.schedule = now + result
@@ -126,9 +128,10 @@ end
 --- Log a message using the bot logger.
 -- The default logger prints the message to stdout with a timestamp.
 -- @param message message to log
+-- @param ... format parameters to message (uses `string.format`)
 -- @note To supply a custom logger, define a `logger(message)` function in the configuration file.
-function bot:log(message)
-	self.logger(message)
+function bot:log(message, ...)
+	self.logger(message:format(...))
 end
 
 --- Enqueue an event for later execution.
