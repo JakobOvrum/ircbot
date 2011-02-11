@@ -28,6 +28,10 @@ require "ircbot.config"
 require "ircbot.command"
 require "ircbot.admin"
 
+--- Create and connect a new bot.
+-- @param config configuration table. Can also be a string file path, in which case the configuration table is loaded from file
+-- @returns new [bot] object
+-- @see [config]
 function new(config)
 	if type(config) == "string" then
 		config = assert(loadConfigTable(config, {"channels", "admins"}))
