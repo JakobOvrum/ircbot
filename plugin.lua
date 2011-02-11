@@ -76,6 +76,8 @@ function bot:unloadPlugins()
 	self:log("Unloaded all plugins")
 end
 
+local disable_uid = {}
+
 --- Load a plugin from file.
 -- @param path path to plugin script
 -- @returns the loaded plugin. On error, nil is returned followed by an error message.
@@ -215,12 +217,23 @@ function bot:loadPlugin(path)
 		self:log(message, ...)
 	end
 
+	--add disable function
+	function p.disable()
+		error(disable_uid)
+	end
+
 	setfenv(f, p)
 
 	local succ, err = pcall(f)
 	if not succ then
-		return raise(err)
-	end
+		if err == disable_uid then
+			return nil, err
+		else
+			return raise(err)
+		end
+	end	
+
+	p.disable = nil	
 
 	if not p.Name then
 		return raise("Plugin name not specified")
@@ -252,12 +265,13 @@ function bot:loadPluginsFolder(dir)
 			local plugin, err = self:loadPlugin(dir.."/"..path)
 
 			if not plugin then
-				return nil, err
+				if err ~= disable_uid then
+					return nil, err
+				end
+			else
+				self:log("Loaded plugin \"%s\"", path)
+				table.insert(newPlugins, plugin)
 			end
-
-			self:log("Loaded plugin \"%s\"", path)
-
-			table.insert(newPlugins, plugin)
 		end
 	end
 
