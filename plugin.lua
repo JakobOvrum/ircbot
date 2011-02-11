@@ -145,12 +145,32 @@ function bot:loadPlugin(path)
 				end);
 				schedule = 0;
 			}
+
+			if env.enabled ~= nil then
+				p.Think.enabled = env.enabled
+			else
+				p.Think.enabled = true
+			end
 			
 			function env.wait(seconds)
 				yield(seconds)
 			end
 		end
 	}
+
+	function p.enableThink()
+		if not p.Think then
+			error("this plugin does not have a Think hook.", 2)
+		end
+		p.Think.enabled = true
+	end
+	
+	function p.disableThink()
+		if not p.Think then
+			error("this plugin does not have a Think hook.", 2)
+		end
+		p.Think.enabled = false
+	end
 
 	function p.Hook(hook)
 		return function(tbl)
@@ -180,8 +200,8 @@ function bot:loadPlugin(path)
 
 	--add send function
 	function p.send(info)
-		local target = assert(info.target, "missing target")
-		local message = assert(info.message, "missing message")
+		local target = info.target or error("missing target", 2)
+		local message = info.message or error("missing message", 2)
 
 		if info.method == "notice" then
 			self:sendNotice(target, message)
