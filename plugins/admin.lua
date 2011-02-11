@@ -31,13 +31,11 @@ Command "reload"
 
 		local succ, err = BOT:loadDefaultPlugins()
 		if not succ then
-			reply(err)
-			return
+			raise(err)
 		end
 		succ, err = BOT:loadPluginsFolder(dir or CONFIG.plugin_dir)
 		if not succ then
-			reply(err)
-			return
+			raise(err)
 		end
 		reply("Reloaded plugins.")
 	end
