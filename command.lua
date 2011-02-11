@@ -18,6 +18,9 @@ local bot = _META
 
 local argHandlers = {
 	string = function(expected, args)
+		if not args then
+			return nil, "arguments expected"
+		end		
 		local t = {args:match(expected)}
 		if #t == 0 then
 			return nil, "invalid argument format"
@@ -142,7 +145,7 @@ function bot:initCommandSystem()
 
 		
 		cmd.raise = function(...)
-			reply(...)
+			cmd.reply(...)
 			error(abort_uid)
 		end
 
