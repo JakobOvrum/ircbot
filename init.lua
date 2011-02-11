@@ -9,6 +9,7 @@ local setmetatable = setmetatable
 local require = require
 local print = print
 local date = os.date
+local time = os.time
 local pcall = pcall
 
 local _G = _G
@@ -86,10 +87,15 @@ function bot:close(message)
 end
 
 function bot:think()
-	for k, think in ipairs(self.thinks) do
-		local succ, err = pcall(think)
-		if not succ then
-			print("Error in Think: "..err)
+	for k, entry in ipairs(self.thinks) do
+		local now = time()
+		if entry.schedule <= now then
+			local succ, result, arg = pcall(entry.think)
+			if not succ then
+				print("Error in Think: " .. result)
+			elseif result == "wait" then
+				entry.schedule = now + arg
+			end
 		end
 	end
 

@@ -14,6 +14,8 @@ local type = type
 local assert = assert
 local print = print
 local rawget = rawget
+local wrap = coroutine.wrap
+local yield = coroutine.yield
 
 local shared = setmetatable({}, {__index = _G})
 
@@ -21,6 +23,7 @@ module "ircbot"
 
 local bot = _META
 
+-- This function creates a proxy object which ensures that a table is read-only and will error if a non-existant field was requested.
 local function configProxy(t)
 	return setmetatable({}, {
 		__index = function(proxy, k)
@@ -36,6 +39,8 @@ local function configProxy(t)
 	})
 end
 
+--- Unload all plugins.
+-- If a plugin has an Unload function, it is called with no parameters.
 function bot:unloadPlugins()
 	local plugins = self.plugins
 
@@ -63,6 +68,10 @@ function bot:unloadPlugins()
 	end
 end
 
+--- Load a plugin from file. The filename must end in ".lua".
+-- @param path path to plugin script
+-- @note
+-- This method is not usually used directly; use bot:loadPluginsFolder instead.
 function bot:loadPlugin(path)
 	local modname = path:match("/(.-)%.lua$")
 	local function raise(message)
@@ -113,11 +122,24 @@ function bot:loadPlugin(path)
 
 	--add Hook function
 	local specialHooks = {
-		Think = function(f)
+		Think = function(f, env)
 			if p.Think then
 				error("There can only be one Think hook per plugin", 3)
 			end
-			p.Think = f
+
+			p.Think = {
+				think = wrap(function() 
+					while true do 
+						f() 
+						yield() 
+					end 
+				end);
+				schedule = 0;
+			}
+			
+			function env.wait(seconds)
+				yield("wait", seconds)
+			end
 		end
 	}
 
@@ -132,7 +154,7 @@ function bot:loadPlugin(path)
 
 			local specialHook = specialHooks[hook]
 			if specialHook then
-				specialHook(f)
+				specialHook(f, tbl)
 				return
 			end
 
