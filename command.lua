@@ -32,7 +32,7 @@ local argHandlers = {
 		local t = {}
 		args:gsub("(%S+)", function(word) table.insert(t, word) end)
 
-		if #t > -1 and #t < expected then
+		if expected > -1 and #t < expected then
 			return nil, ("got %d arguments, expected %d"):format(#t, expected)
 		end
 		return t
@@ -108,17 +108,17 @@ function bot:initCommandSystem()
 		end
 
 		local function raise(err)
+			self:log("[%s] %s", channel, errorMessage)
 			local redirect = config.redirect_errors
 			if redirect == true then return end
 			local errorMessage = ("Error in command \"%s\": %s"):format(cmdname, err)
-			print(channel, errorMessage)
 			self:sendChat(type(redirect) == "string" and redirect or channel, errorMessage)
 		end
 		
 		local args = msg:match("^%S+ (.+)$")
 
 		local argParser = cmd.ArgParser
-		if argParser and args then
+		if argParser then
 			local parsed, err = argParser(cmd.expectedArgs, args)
 			if not parsed then
 				return raise(err)
@@ -127,10 +127,18 @@ function bot:initCommandSystem()
 		end
 		
 		cmd.user, cmd.channel = user, channel
+		cmd.pm = channel == config.nick
 		cmd.reply = function(fmt, ...)
-			fmt = fmt or error("bad argument #1 to 'reply' (expected string, got "..type(fmt), 2)
-			self:sendChat(config.nick == channel and user.nick or channel, format(fmt, ...))
+			if type(fmt) ~= "string" then
+				error(("bad argument #1 to 'reply' (expected string, got %s)"):format(type(fmt)), 2)
+			end
+			if cmd.pm then
+				self:sendChat(user.nick, format(fmt, ...))
+			else
+				self:sendChat(channel, format(fmt, ...))
+			end
 		end
+
 		
 		cmd.raise = function(...)
 			reply(...)
