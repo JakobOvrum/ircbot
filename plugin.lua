@@ -138,7 +138,7 @@ function bot:loadPlugin(path)
 			}
 			
 			function env.wait(seconds)
-				yield("wait", seconds)
+				yield(seconds)
 			end
 		end
 	}
