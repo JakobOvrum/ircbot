@@ -58,54 +58,60 @@ function bot:RegisterCommand(plugin, names, tbl)
 	setfenv(f, tbl)
 
 	for k,name in ipairs(names) do
-		assert(not name:find(" "), "command name can not contain spaces")
-		self.commands[name] = tbl
+		assert(not name:find("%s"), "command name must not contain whitespace")
+		plugin.commands[name] = tbl
 	end
 end
 
-function bot:hasCommandSystem()
-	return not self.config.no_command_system
-end
+local abort_uid = {}
 
-function bot:flushCommands()
-	local cmds = self.commands
-	for k,v in ipairs(cmds) do cmds[k] = nil end
-end
-
+--- Default command prefix for bots when not overriden by the bots configuration file or the plugin.
 CommandPrefix = "!"
-function commandPrefix(new)
-	local cmdPrefix = CommandPrefix
-	CommandPrefix = new or cmdPrefix
-	return cmdPrefix
-end
 
-function bot:initCommandSystem()
-	local commands = {}
-	local abort_uid = {}
-	self.commands = commands
+function bot:initCommandSystem(plugin)
+	if plugin.commandSystemInitialized then
+		error("command system is already initialized for this plugin", 2)
+	end
+	plugin.commandSystemInitialized = true
 
+	local commands = plugin.commands
 	local config = self.config
+
 	local function report(user, channel, action)
 		self:log(("user '%s@%s' tried to %s (in %s)"):format(user.nick, user.host, action, channel))
 	end
 	
-	self:hook("OnChat", "_cmdhandler", function(user, channel, msg)
-		local cmdname = msg:match(table.concat{"^", CommandPrefix, "(%S+)"})
+	--add Command function
+	function plugin.Command(name)
+		local names = {name}
+			local function reg(tbl)
+			if type(tbl) == "string" then
+				table.insert(names, tbl)
+				return reg
+			else
+				self:RegisterCommand(plugin, names, tbl)
+			end
+		end
+		return reg
+	end
+
+	local commandPattern = table.concat{"^", plugin.CommandPrefix or config.CommandPrefix or CommandPrefix, "(%S+)"}
+
+	self:hook("OnChat", plugin, function(user, channel, msg)
+		local cmdname = msg:match(commandPattern)
 		if not cmdname then return end
 		
 		local cmd = commands[cmdname]
 		if not cmd then
-			local ignore = self.config.ignore_unknowncommand_warnings
-			if not ignore then
-				report(user, channel, "run unrecognized command "..cmdname)
+			if not config.ignore_unknowncommand_warnings then
+				report(user, channel, "run unrecognized command " .. cmdname)
 			end
 			return
 		end
 
 		if cmd.admin == true and not self:isAdmin(user) then
-			local ignore = config.ignore_lackofadmin_warnings
-			if not ignore then
-				report(user, channel, "run admin-only command "..cmdname)
+			if not config.ignore_lackofadmin_warnings then
+				report(user, channel, "run admin-only command " .. cmdname)
 			end
 			return
 		end
@@ -132,15 +138,13 @@ function bot:initCommandSystem()
 		
 		cmd.user, cmd.channel = user, channel
 		cmd.pm = channel == config.nick
-		cmd.reply = function(fmt, ...)
-			if type(fmt) ~= "string" then
-				error(("bad argument #1 to 'reply' (expected string, got %s)"):format(type(fmt)), 2)
+		cmd.reply = function(message, ...)
+			if type(message) ~= "string" then
+				error(("bad argument #1 to 'reply' (expected string, got %s)"):format(type(message)), 2)
 			end
-			if cmd.pm then
-				self:sendChat(user.nick, format(fmt, ...))
-			else
-				self:sendChat(channel, format(fmt, ...))
-			end
+			message = ... and message:format(...) or message
+			self:sendChat(cmd.pm and user.nick or channel, message)
+			return message
 		end
 
 		
@@ -159,5 +163,12 @@ function bot:initCommandSystem()
 		if not succ and err ~= abort_uid then
 			return raise(err)
 		end
+
+		--signal to LuaIRC that this event was handled
+		return true
 	end)
+end
+
+function bot:shutdownCommandSystem(plugin)
+	self:unhook("OnChat", plugin)
 end

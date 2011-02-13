@@ -41,8 +41,16 @@ local function configProxy(t)
 	})
 end
 
+--- Unload a single plugin.
+-- This removes all plugin hooks and commands, and removes the plugin from the shared plugin environment.
+-- If a plugin has an Unload function, it is called with no parameters.
+-- @param i plugin index in plugin table
+-- @note
+-- This method is not usually used directly; use [bot:unloadPlugins] instead.
+-- @note
+-- The Unload function is not called in a protected environment.
 function bot:unloadPlugin(i)
-	local plugin = self.plugins[i]
+	local plugin = assert(self.plugins[i], "invalid plugin index")
 	local unload = plugin.Unload
 	if unload then
 		unload()
@@ -52,6 +60,8 @@ function bot:unloadPlugin(i)
 		self:unhook(h.type, h.id)
 	end
 
+	self:shutdownCommandSystem(plugin)
+
 	shared[plugin.ModuleName] = nil
 	self.plugins[i] = nil
 	if plugin.Think then
@@ -60,17 +70,12 @@ function bot:unloadPlugin(i)
 end
 
 --- Unload all plugins.
--- If a plugin has an Unload function, it is called with no parameters.
+-- @see [bot:unloadPlugin]
 function bot:unloadPlugins()
 	local plugins = self.plugins
 
 	for i = 1, #self.plugins do
 		self:unloadPlugin(i)
-	end
-
-	-- TODO: move this to a per-plugin basis
-	if self:hasCommandSystem() then
-		self:flushCommands()
 	end
 
 	self:log("Unloaded all plugins")
@@ -83,10 +88,15 @@ local disable_uid = {}
 -- @returns the loaded plugin. On error, nil is returned followed by an error message.
 -- @note
 -- This method is not usually used directly; use bot:loadPluginsFolder instead.
+-- @see [plugin]
 function bot:loadPlugin(path)
-	local modname = path:match("/(.-)%.lua$") or path
+	local modname = path:match("[/\\](.-)%.lua$") or path
 	local function raise(message)
 		return nil, table.concat{"Error loading plugin \"", modname, "\": ", message}
+	end
+
+	if shared[modname] then
+		return raise(("plugin already loaded (from \"%s\")"):format(shared[modname].Path))
 	end
 
 	local f, err = loadfile(path)
@@ -108,34 +118,20 @@ function bot:loadPlugin(path)
 		Path = path;
 
 		_hooks = {};
+		commands = {};
 	}
 	p.PLUGIN = p
 	setmetatable(p, {__index = shared})
 	shared[modname] = p.public
 
-	--add Command function
-	if self:hasCommandSystem() then
-		p.Command = function(name)
-			local names = {name}
-
-			local function reg(tbl)
-				if type(tbl) == "string" then
-					table.insert(names, tbl)
-					return reg
-				else
-					self:RegisterCommand(p, names, tbl)
-				end
-			end
-
-			return reg
-		end
-	end
+	--add command hook and Command function
+	self:initCommandSystem(p)
 
 	--add Hook function
 	local specialHooks = {
 		Think = function(f, env)
 			if p.Think then
-				error("There can only be one Think hook per plugin", 3)
+				error("there can only be one Think hook per plugin", 3)
 			end
 
 			p.Think = {
@@ -148,12 +144,8 @@ function bot:loadPlugin(path)
 				schedule = 0;
 			}
 
-			if env.enabled ~= nil then
-				p.Think.enabled = env.enabled
-			else
-				p.Think.enabled = true
-			end
-			
+			p.Think.enabld = not not env.enabled
+
 			function env.wait(seconds)
 				yield(seconds)
 			end
@@ -233,13 +225,11 @@ function bot:loadPlugin(path)
 		end
 	end	
 
-	p.disable = nil	
+	p.disable = nil
 
 	if not p.Name then
-		return raise("Plugin name not specified")
+		return raise("plugin name not specified")
 	end
-
-	p.CommandPrefix = p.CommandPrefix or "!"
 
 	local load = p.Load
 	if load then
@@ -262,7 +252,7 @@ function bot:loadPluginsFolder(dir)
 
 	for path in lfs.dir(dir) do
 		if path:match("%.lua$") then
-			local plugin, err = self:loadPlugin(dir.."/"..path)
+			local plugin, err = self:loadPlugin(table.concat{dir, "/", path})
 
 			if not plugin then
 				if err ~= disable_uid then

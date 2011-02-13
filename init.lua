@@ -52,6 +52,7 @@ function new(config)
 		end;
 	}
 	
+	-- Lookup precedence: bot table, bot method table, connection table
 	setmetatable(b, {
 		__index = function(self, key)
 			local value = rawget(self, key)
@@ -67,6 +68,7 @@ function new(config)
 
 	b:log("Connected to %s", config.server)
 	
+	-- TODO: what's the point in safe config files if on_connect is exempted?
 	local on_connect = config.on_connect
 	if on_connect then
 		setfenv(on_connect, _G)
@@ -82,10 +84,6 @@ function new(config)
 			end
 		end
 	end
-
-	if b:hasCommandSystem() then
-		b:initCommandSystem()
-	end
 	
 	if b:hasAdminSystem() then
 		b:initAdminSystem()
@@ -94,6 +92,8 @@ function new(config)
 	return b, config
 end
 
+--- Cleanly unload all plugins and disconnect.
+-- @param message quit message [optional]
 function bot:close(message)
 	self:unloadPlugins()
 	self.conn:disconnect(message)
@@ -104,28 +104,27 @@ local function fastremove(t, pos)
 	t[pos] = remove(t)
 end
 
+--- Handle incoming data and invoke events. This should be called as often as possible.
 function bot:think()
 	self.conn:think()
 	
-	local now = time()
 	for k, entry in ipairs(self.thinks) do
-		if entry.enabled and entry.schedule <= now then
+		if entry.enabled and entry.schedule <= time() then
 			local succ, result, arg = pcall(entry.think)
 			if not succ then
 				self:log("Error in Think: %s", result)
 				fastremove(self.thinks, k)
 			elseif result then
-				entry.schedule = now + result
+				entry.schedule = time() + result
 			end
 		end
 	end
 
 	local queue = self.queue
-	local timePassed = now - queue.lastSend
-	if #queue > 0 and timePassed >= queue.interval then
+	if #queue > 0 and time() - queue.lastSend >= queue.interval then
 		local entry = remove(queue)
 		entry.cb(unpack(entry))
-		queue.lastSend = now
+		queue.lastSend = time()
 	end
 end
 
