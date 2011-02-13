@@ -102,12 +102,7 @@ function bot:initCommandSystem(plugin)
 		if not cmdname then return end
 		
 		local cmd = commands[cmdname]
-		if not cmd then
-			if not config.ignore_unknowncommand_warnings then
-				report(user, channel, "run unrecognized command " .. cmdname)
-			end
-			return
-		end
+		if not cmd then return end
 
 		if cmd.admin == true and not self:isAdmin(user) then
 			if not config.ignore_lackofadmin_warnings then
