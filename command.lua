@@ -9,8 +9,9 @@ local setmetatable = setmetatable
 local setfenv = setfenv
 local print = print
 local ipairs = ipairs
-
 local format = string.format
+
+require "tableprint"
 
 module "ircbot"
 
@@ -46,12 +47,27 @@ function bot:registerCommand(plugin, names, tbl)
 	tbl.callback = assert(tbl.callback or tbl[1], "callback not specified")
 	local f = tbl.callback
 
-	tbl.admin = not not tbl.admin
-	
+	if tbl.admin then
+		tbl.admin = true
+	end
+
 	assert(type(f) == "function", "callback is not a function")
 
 	if tbl.expectedArgs then
 		tbl.ArgParser = assert(argHandlers[type(tbl.expectedArgs)], "\"expectedArgs\" is of unsupported type")
+	end
+
+	if tbl.blacklist and tbl.whitelist then
+		error("commands can not have both a blacklist and whitelist.", 2)
+	end
+
+	local list = tbl.blacklist or tbl.whitelist
+	if list then
+		local newList = {}
+		for k, channel in ipairs(list) do
+			newList[channel] = true
+		end
+		tbl[tbl.blacklist and "blacklist" or "whitelist"] = newList
 	end
 	
 	setmetatable(tbl, {__index = plugin})
@@ -84,6 +100,12 @@ function bot:initCommandSystem(plugin)
 		
 		local cmd = commands[cmdname]
 		if not cmd then return end
+
+		local blacklist = cmd.blacklist
+		if blacklist and blacklist[channel] then return end
+
+		local whitelist = cmd.whitelist
+		if whitelist and not whitelist[channel] then return end
 
 		if cmd.admin == true and not self:isAdmin(user) then
 			if not config.ignore_lackofadmin_warnings then
