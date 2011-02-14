@@ -5,11 +5,12 @@ module "ircbot"
 
 local bot = _META
 
-local loggedIn = {}
+local loggedIn
 local admins
 
 function bot:reloadAdmins()
 	admins = self.config.admins or {}
+	loggedIn = {}
 end
 
 local function isAdmin(self, user)
