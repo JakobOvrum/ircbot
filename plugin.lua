@@ -133,13 +133,13 @@ function bot:loadPlugin(path)
 
 	plugin.Command = pluginAggregate(
 		function(alias, tbl)
-			self:registerCommand(plugin, alias, tbl) 
+			self:registerCommand(plugin, alias, tbl, 3) 
 		end
 	)
 
 	plugin.Hook = pluginAggregate(
 		function(hooks, tbl)
-			self:registerHook(plugin, hooks, tbl)
+			self:registerHook(plugin, hooks, tbl, 3)
 		end
 	)
 

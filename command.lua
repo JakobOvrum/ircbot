@@ -43,22 +43,35 @@ local argHandlers = {
 	end;
 }
 
-function bot:registerCommand(plugin, names, tbl)
-	tbl.callback = assert(tbl.callback or tbl[1], "callback not specified")
+function bot:registerCommand(plugin, names, tbl, errorlevel)
+	local function raise(message)
+		error(format("%s (in command \"%s\")", message, table.concat(names, ", ")), errorlevel + 2)
+	end
+
+	if not tbl.callback then
+		if tbl[1] then
+			tbl.callback = tbl[1]
+			tbl[1] = nil
+		else
+			raise("command callback not specified")
+		end
+	end
 	local f = tbl.callback
+
+	if type(f) ~= "function" then
+		raise("callback is not a function")
+	end
 
 	if tbl.admin then
 		tbl.admin = true
 	end
 
-	assert(type(f) == "function", "callback is not a function")
-
 	if tbl.expectedArgs then
-		tbl.ArgParser = assert(argHandlers[type(tbl.expectedArgs)], "\"expectedArgs\" is of unsupported type")
+		tbl.ArgParser = argHandlers[type(tbl.expectedArgs)] or raise("\"expectedArgs\" is of unsupported type")
 	end
 
 	if tbl.blacklist and tbl.whitelist then
-		error("commands can not have both a blacklist and whitelist.", 2)
+		raise("commands can not have both a blacklist and whitelist")
 	end
 
 	local list = tbl.blacklist or tbl.whitelist
@@ -74,7 +87,9 @@ function bot:registerCommand(plugin, names, tbl)
 	setfenv(f, tbl)
 
 	for k,name in ipairs(names) do
-		assert(not name:find("%s"), "command name must not contain whitespace")
+		if name:find("%s") then
+			raise("command name can not contain whitespace")
+		end
 		plugin.commands[name] = tbl
 	end
 end
