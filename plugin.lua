@@ -122,7 +122,6 @@ function bot:loadPlugin(path)
 	}
 	p.PLUGIN = p
 	setmetatable(p, {__index = shared})
-	shared[modname] = p.public
 
 	--add command hook and Command function
 	self:initCommandSystem(p)
@@ -211,6 +210,7 @@ function bot:loadPlugin(path)
 
 	--add disable function
 	function p.disable()
+		self:shutdownCommandSystem(p)
 		error(disable_uid)
 	end
 
@@ -231,10 +231,13 @@ function bot:loadPlugin(path)
 		return raise("plugin name not specified")
 	end
 
+	--install plugin
 	local load = p.Load
 	if load then
 		load(self)
 	end
+
+	shared[modname] = p.public
 
 	local think = p.Think
 	if think then

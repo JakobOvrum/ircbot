@@ -69,11 +69,6 @@ local abort_uid = {}
 CommandPrefix = "!"
 
 function bot:initCommandSystem(plugin)
-	if plugin.commandSystemInitialized then
-		error("command system is already initialized for this plugin", 2)
-	end
-	plugin.commandSystemInitialized = true
-
 	local commands = plugin.commands
 	local config = self.config
 
