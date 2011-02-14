@@ -15,7 +15,10 @@ local bot, config = ircbot.new("config.lua")
 assert(bot:loadDefaultPlugins())
 
 -- Load bot plugins.
-assert(bot:loadPluginsFolder(config.plugin_dir))
+local plugins, err = bot:loadPluginsFolder(config.plugin_dir)
+if not plugins then
+	bot:log(err)
+end
 
 while true do
 	-- Call this for every bot you have to handle incoming data and events.
