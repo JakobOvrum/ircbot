@@ -151,6 +151,21 @@ function bot:loadPlugin(path)
 			self:registerHook(plugin, hooks, tbl, 3)
 		end
 	)
+	
+	function plugin.RequireConfiguration(tbl)
+		for key, value in pairs(tbl) do
+			if type(key) == "number" then
+				if self.config[value] == nil then
+					error(("this plugin requires configuration value \"%s\""):format(value), 2)
+				end
+			else
+				local t = type(self.config[key])
+				if t ~= value then
+					error(("configuration value \"%s\" is of invalid type \"%s\" (must be a %s)"):format(key, t, value), 2)
+				end
+			end
+		end
+	end
 
 	function plugin.enableThink()
 		if not plugin.Think then
@@ -235,6 +250,21 @@ end
 
 --hooks intercepted by the bot system
 local botHooks = {}
+
+local function addSimpleHook(name)
+	local errormsg = ("there can only be one %s hook per plugin"):format(name)
+	botHooks[name] = function(plugin, callback, env)
+		if plugin[name] then
+			error(errormsg, 3)
+		end
+
+		plugin[name] = callback
+	end
+end
+
+addSimpleHook("Load")
+addSimpleHook("Unload")
+addSimpleHook("PostLoad")
 
 function botHooks.Think(plugin, callback, env)
 	if plugin.Think then
