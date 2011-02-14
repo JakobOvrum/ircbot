@@ -73,6 +73,30 @@ function bot:unloadPlugins()
 	self:log("Unloaded all plugins")
 end
 
+-- used to create constructs like Command "foo" "bar" { function(...) log(...) end }
+local function pluginAggregate(callback)
+	return function(...)
+		local names = {...}
+		local function register(arg)
+			if type(arg) == "string" then
+				table.insert(names, arg)
+				return register
+			else
+				if not arg.callback then
+					if arg[1] then
+						arg.callback = arg[1]
+						arg[1] = nil
+					else
+						error("callback not specified", 2)
+					end
+				end
+				callback(names, arg)
+			end
+		end
+		return register
+	end
+end
+
 local disable_uid = {}
 
 --- Load a plugin from file.
@@ -115,21 +139,6 @@ function bot:loadPlugin(path)
 	}
 	plugin.PLUGIN = plugin
 	setmetatable(plugin, {__index = self.shared})
-
-	local function pluginAggregate(callback)
-		return function(...)
-			local names = {...}
-			local function register(arg)
-				if type(arg) == "string" then
-					table.insert(names, arg)
-					return register
-				else
-					callback(names, arg)
-				end
-			end
-			return register
-		end
-	end
 
 	plugin.Command = pluginAggregate(
 		function(alias, tbl)
@@ -248,9 +257,16 @@ function botHooks.Think(plugin, callback, env)
 	end
 end
 
-function bot:registerHook(plugin, hooks, tbl)
-	local f = assert(tbl.callback or tbl[1], "callback not provided")
-	assert(type(f) == "function", "callback not a function value")
+function bot:registerHook(plugin, hooks, tbl, errorlevel)
+	local function raise(message)
+		error(("%s (in hook \"%s\")"):format(message, table.concat(hooks, ", ")), errorlevel + 2)
+	end
+
+	local f = tbl.callback
+
+	if type(f) ~= "function" then
+		raise("callback is not a function")
+	end
 
 	tbl.self = self
 	setmetatable(tbl, {__index = plugin})

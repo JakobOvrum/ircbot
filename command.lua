@@ -48,17 +48,7 @@ function bot:registerCommand(plugin, names, tbl, errorlevel)
 		error(format("%s (in command \"%s\")", message, table.concat(names, ", ")), errorlevel + 2)
 	end
 
-	if not tbl.callback then
-		if tbl[1] then
-			tbl.callback = tbl[1]
-			tbl[1] = nil
-		else
-			raise("command callback not specified")
-		end
-	end
-	local f = tbl.callback
-
-	if type(f) ~= "function" then
+	if type(tbl.callback) ~= "function" then
 		raise("callback is not a function")
 	end
 
@@ -84,7 +74,7 @@ function bot:registerCommand(plugin, names, tbl, errorlevel)
 	end
 	
 	setmetatable(tbl, {__index = plugin})
-	setfenv(f, tbl)
+	setfenv(tbl.callback, tbl)
 
 	for k,name in ipairs(names) do
 		if name:find("%s") then
