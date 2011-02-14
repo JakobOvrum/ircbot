@@ -56,7 +56,7 @@ function bot:unloadPlugin(i)
 		unload()
 	end
 
-	for k, h in ipairs(plugin._hooks) do
+	for k, h in ipairs(plugin.hooks) do
 		self:unhook(h.type, h.id)
 	end
 
@@ -104,7 +104,7 @@ function bot:loadPlugin(path)
 		return raise(err)
 	end
 
-	local p = {
+	local plugin = {
 		color = irc.color;
 		bold = irc.bold;
 		underline = irc.underline;
@@ -117,82 +117,55 @@ function bot:loadPlugin(path)
 		ModuleName = modname;
 		Path = path;
 
-		_hooks = {};
+		hooks = {};
 		commands = {};
 	}
-	p.PLUGIN = p
-	setmetatable(p, {__index = shared})
+	plugin.PLUGIN = plugin
+	setmetatable(plugin, {__index = shared})
 
-	--add command hook and Command function
-	self:initCommandSystem(p)
-
-	--add Hook function
-	local specialHooks = {
-		Think = function(f, env)
-			if p.Think then
-				error("there can only be one Think hook per plugin", 3)
+	local function pluginAggregate(callback)
+		return function(...)
+			local names = {...}
+			local function register(arg)
+				if type(arg) == "string" then
+					table.insert(names, arg)
+					return register
+				else
+					callback(names, arg)
+				end
 			end
-
-			p.Think = {
-				think = wrap(function() 
-					while true do 
-						f() 
-						yield() 
-					end 
-				end);
-				schedule = 0;
-			}
-
-			p.Think.enabld = not not env.enabled
-
-			function env.wait(seconds)
-				yield(seconds)
-			end
+			return register
 		end
-	}
+	end
 
-	function p.enableThink()
-		if not p.Think then
+	plugin.Command = pluginAggregate(
+		function(alias, tbl)
+			self:registerCommand(plugin, alias, tbl) 
+		end
+	)
+
+	plugin.Hook = pluginAggregate(
+		function(hooks, tbl)
+			self:registerHook(plugin, hooks, tbl)
+		end
+	)
+
+	function plugin.enableThink()
+		if not plugin.Think then
 			error("this plugin does not have a Think hook.", 2)
 		end
-		p.Think.enabled = true
+		plugin.Think.enabled = true
 	end
 	
-	function p.disableThink()
-		if not p.Think then
+	function plugin.disableThink()
+		if not plugin.Think then
 			error("this plugin does not have a Think hook.", 2)
 		end
-		p.Think.enabled = false
-	end
-
-	function p.Hook(hook)
-		return function(tbl)
-			local f = assert(tbl.callback or tbl[1], "callback not provided")
-			assert(type(f) == "function", "callback not a function value")
-
-			tbl.self = self
-			setmetatable(tbl, {__index = p})
-			setfenv(f, tbl)
-
-			local specialHook = specialHooks[hook]
-			if specialHook then
-				specialHook(f, tbl)
-				return
-			end
-
-			local hookInfo = {type = hook}
-			table.insert(p._hooks, hookInfo)
-			hookInfo.id = self:hook(hook, function(...)
-				local succ, err = pcall(f, ...)
-				if not succ then
-					self:log("Error running hook \"%s\": %s", hook, err)
-				end
-			end)
-		end
+		plugin.Think.enabled = false
 	end
 
 	--add send function
-	function p.send(info)
+	function plugin.send(info)
 		local target = info.target or error("missing target", 2)
 		local message = info.message or error("missing message", 2)
 
@@ -204,17 +177,16 @@ function bot:loadPlugin(path)
 	end
 
 	--add log function
-	function p.log(message, ...)
+	function plugin.log(message, ...)
 		self:log(message, ...)
 	end
 
 	--add disable function
-	function p.disable()
-		self:shutdownCommandSystem(p)
+	function plugin.disable()
 		error(disable_uid)
 	end
 
-	setfenv(f, p)
+	setfenv(f, plugin)
 
 	local succ, err = pcall(f)
 	if not succ then
@@ -225,28 +197,81 @@ function bot:loadPlugin(path)
 		end
 	end	
 
-	p.disable = nil
+	plugin.disable = nil
 
-	if not p.Name then
+	if not plugin.Name then
 		return raise("plugin name not specified")
 	end
 
 	--install plugin
-	local load = p.Load
+	local load = plugin.Load
 	if load then
 		load(self)
 	end
 
-	shared[modname] = p.public
+	shared[modname] = plugin.public
 
-	local think = p.Think
+	local think = plugin.Think
 	if think then
 		local i = #self.thinks + 1
 		table.insert(self.thinks, i, think)
-		p.thinkIndex = i
+		plugin.thinkIndex = i
 	end
 
-	return p
+	self:initCommandSystem(plugin)
+
+	return plugin
+end
+
+--hooks intercepted by the bot system
+local botHooks = {}
+
+function botHooks.Think(plugin, callback, env)
+	if plugin.Think then
+		error("there can only be one Think hook per plugin", 3)
+	end
+
+	plugin.Think = {
+		think = wrap(function()
+			while true do
+				callback()
+				yield()
+			end
+		end);
+		schedule = 0;
+		enabled = env.initiallyDisabled or true;
+	}
+
+	function env.wait(seconds)
+		yield(seconds)
+	end
+end
+
+function bot:registerHook(plugin, hooks, tbl)
+	local f = assert(tbl.callback or tbl[1], "callback not provided")
+	assert(type(f) == "function", "callback not a function value")
+
+	tbl.self = self
+	setmetatable(tbl, {__index = plugin})
+	setfenv(f, tbl)
+
+	for k, hook in ipairs(hooks) do
+		local botHook = botHooks[hook]
+		if botHook then
+			botHook(plugin, f, tbl)
+		else
+			local hookInfo = {
+				type = hook;
+				id = self:hook(hook, function(...)
+					local succ, err = pcall(f, ...)
+					if not succ then
+						self:log("Error running hook \"%s\": %s", hook, err)
+					end
+				end);
+			}
+			table.insert(plugin.hooks, hookInfo)
+		end
+	end
 end
 
 --- Load all plugins in a folder.

@@ -42,7 +42,7 @@ local argHandlers = {
 	end;
 }
 
-function bot:RegisterCommand(plugin, names, tbl)
+function bot:registerCommand(plugin, names, tbl)
 	tbl.callback = assert(tbl.callback or tbl[1], "callback not specified")
 	local f = tbl.callback
 
@@ -74,20 +74,6 @@ function bot:initCommandSystem(plugin)
 
 	local function report(user, channel, action)
 		self:log(("user '%s@%s' tried to %s (in %s)"):format(user.nick, user.host, action, channel))
-	end
-	
-	--add Command function
-	function plugin.Command(name)
-		local names = {name}
-			local function reg(tbl)
-			if type(tbl) == "string" then
-				table.insert(names, tbl)
-				return reg
-			else
-				self:RegisterCommand(plugin, names, tbl)
-			end
-		end
-		return reg
 	end
 
 	local commandPattern = table.concat{"^", plugin.CommandPrefix or config.CommandPrefix or CommandPrefix, "(%S+)"}
