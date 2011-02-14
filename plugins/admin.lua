@@ -2,7 +2,7 @@
 	IRC Bot Administration
 ]]
 
-PLUGIN.Name = "Administration"
+Name = "Administration"
 
 -- uncomment to disable this plugin
 -- disable()

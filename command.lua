@@ -52,9 +52,8 @@ function bot:registerCommand(plugin, names, tbl, errorlevel)
 		raise("callback is not a function")
 	end
 
-	if tbl.admin then
-		tbl.admin = true
-	end
+	tbl.admin = not not tbl.admin
+	tbl.help = tbl.help or "No description."
 
 	if tbl.expectedArgs then
 		tbl.ArgParser = argHandlers[type(tbl.expectedArgs)] or raise("\"expectedArgs\" is of unsupported type")
@@ -97,7 +96,8 @@ function bot:initCommandSystem(plugin)
 		self:log(("user '%s@%s' tried to %s (in %s)"):format(user.nick, user.host, action, channel))
 	end
 
-	local commandPattern = table.concat{"^", plugin.CommandPrefix or config.CommandPrefix or CommandPrefix, "(%S+)"}
+	plugin.CommandPrefix = plugin.CommandPrefix or config.CommandPrefix or CommandPrefix
+	local commandPattern = table.concat{"^", plugin.CommandPrefix, "(%S+)"}
 
 	self:hook("OnChat", plugin, function(user, channel, msg)
 		local cmdname = msg:match(commandPattern)

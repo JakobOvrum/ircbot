@@ -106,7 +106,7 @@ local disable_uid = {}
 -- This method is not usually used directly; use bot:loadPluginsFolder instead.
 -- @see [plugin]
 function bot:loadPlugin(path)
-	local modname = path:match("[/\\](.-)%.lua$") or path
+	local modname = path:match("[/\\]([^/\\]+)%.lua$") or path
 	local function raise(message)
 		return nil, table.concat{"Error loading plugin \"", modname, "\": ", message}
 	end
@@ -167,9 +167,9 @@ function bot:loadPlugin(path)
 	end
 
 	--add send function
-	function plugin.send(info)
+	function plugin.send(info, optMsg)
 		local target = info.target or error("missing target", 2)
-		local message = info.message or error("missing message", 2)
+		local message = info.message or optMsg or error("missing message", 2)
 
 		if info.method == "notice" then
 			self:sendNotice(target, message)
@@ -342,10 +342,10 @@ function bot:loadDefaultPlugins()
 		return false, notFound
 	end
 
-	libPath = libPath:match("^(.-)[/\\][^/\\]+$")
+	libPath = libPath:match("^(.-[/\\])[^/\\]+$")
 	if not libPath then
 		return false, notFound
 	end
 
-	return self:loadPluginsFolder(libPath .. "/plugins")	
+	return self:loadPluginsFolder(libPath .. "plugins")	
 end
