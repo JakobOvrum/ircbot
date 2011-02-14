@@ -2,24 +2,16 @@
 	IRC Bot Administration
 ]]
 
-Name = "Administration"
+Name = "Bot Administration"
 
 -- uncomment to disable this plugin
 -- disable()
 
 --bot administration
-Command "login"
-{	
-	function(password)
-		if CONFIG.password and CONFIG.password == password then
-			reply("Welcome, %s", user.nick)
-			loggedIn[user.host] = true
-		end
-	end
-}
-
 Command "reload"
 {
+	help = "Reload all plugins from either a specified directory or from the `plugin_dir` configuration value.";
+	
 	admin = true;
 	
 	function(dir)
@@ -39,6 +31,8 @@ Command "reload"
 
 Command "unload"
 {
+	help = "Unload a previously loaded plugin by name.";
+
 	expectedArgs = 1;
 	admin = true;
 
@@ -51,6 +45,8 @@ Command "unload"
 
 Command "load"
 {
+	help = "Load a plugin from file.";
+	
 	admin = true;
 
 	function(path)
@@ -69,8 +65,30 @@ Command "load"
 	end
 }
 
+Command "loaddir"
+{
+	help = "Load all plugins from a directory.";
+	
+	admin = true;
+	
+	function(path)
+		if not path then
+			raise("Expected path.")
+		end
+		
+		local plugins, err = self:loadPluginsFolder(path)
+		if not plugins then
+			raise(err)
+		end
+		
+		reply("Loaded %d plugins from \"%s\"", #plugins, path)
+	end
+}
+
 Command "quit" "exit"
 {
+	help = "Terminate the bot, optionally with a particular quit message.";
+	
 	admin = true;
 	
 	function(message)
@@ -79,42 +97,10 @@ Command "quit" "exit"
 	end
 }
 
---irc helpers
-Command "join"
-{
-	expectedArgs = -1;
-	admin = true;
-	
-	function(channel, key)
-		self:join(channel, key)
-		reply("Joined %s", channel)
-	end
-}
-
-Command "part"
-{
-	expectedArgs = 1;
-	admin = true;
-
-	function(channel)
-		self:part(channel)
-		reply("Left %s", channel)
-	end
-}
-
-Command "pm" "send"
-{
-	expectedArgs = "^(%S+) (.+)$";
-	admin = true;
-
-	function(target, message)
-		self:sendChat(target, message)
-		reply("Sent \"%s\" to \"%s\"", message, target)
-	end
-}
-
 Command "memory"
 {
+	help = "Display the current amount of memory in use by the Lua VM.";
+	
 	admin = true;
 
 	function()
@@ -124,6 +110,8 @@ Command "memory"
 
 Command "pollinterval"
 {
+	help = "Display or set the message queue poll interval.";
+	
 	admin = true;
 
 	function(new)
@@ -137,5 +125,45 @@ Command "pollinterval"
 		else
 			reply("The current poll interval is %fs", self:getPollInterval())
 		end
+	end
+}
+
+--irc helpers
+Command "join"
+{
+	help = "Join a channel.";
+	
+	expectedArgs = -1;
+	admin = true;
+	
+	function(channel, key)
+		self:join(channel, key)
+		reply("Joined %s", channel)
+	end
+}
+
+Command "part"
+{
+	help = "Leave a channel.";
+	
+	expectedArgs = 1;
+	admin = true;
+
+	function(channel)
+		self:part(channel)
+		reply("Left %s", channel)
+	end
+}
+
+Command "pm" "send"
+{
+	help = "Send a message to a channel or user.";
+
+	expectedArgs = "^(%S+) (.+)$";
+	admin = true;
+
+	function(target, message)
+		self:sendChat(target, message)
+		reply("Sent \"%s\" to \"%s\"", message, target)
 	end
 }
