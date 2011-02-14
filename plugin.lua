@@ -22,9 +22,6 @@ module "ircbot"
 
 local bot = _META
 
---- Shared plugin environment.
-shared = setmetatable({}, {__index = _G})
-
 -- This function creates a proxy object which ensures that a table is read-only and will error if a non-existant field was requested.
 local function configProxy(t)
 	return setmetatable({}, {
@@ -44,13 +41,10 @@ end
 --- Unload a single plugin.
 -- This removes all plugin hooks and commands, and removes the plugin from the shared plugin environment.
 -- If a plugin has an Unload function, it is called with no parameters.
--- @param i plugin index in plugin table
--- @note
--- This method is not usually used directly; use [bot:unloadPlugins] instead.
+-- @param plugin plugin to unload
 -- @note
 -- The Unload function is not called in a protected environment.
-function bot:unloadPlugin(i)
-	local plugin = assert(self.plugins[i], "invalid plugin index")
+function bot:unloadPlugin(plugin)
 	local unload = plugin.Unload
 	if unload then
 		unload()
@@ -62,8 +56,8 @@ function bot:unloadPlugin(i)
 
 	self:shutdownCommandSystem(plugin)
 
-	shared[plugin.ModuleName] = nil
-	self.plugins[i] = nil
+	self.shared[plugin.ModuleName] = nil
+	self.plugins[plugin.ModuleName] = nil
 	if plugin.Think then
 		table.remove(self.thinks, plugin.thinkIndex)
 	end
@@ -72,10 +66,8 @@ end
 --- Unload all plugins.
 -- @see [bot:unloadPlugin]
 function bot:unloadPlugins()
-	local plugins = self.plugins
-
-	for i = 1, #self.plugins do
-		self:unloadPlugin(i)
+	for name, plugin in pairs(self.plugins) do
+		self:unloadPlugin(plugin)
 	end
 
 	self:log("Unloaded all plugins")
@@ -95,8 +87,8 @@ function bot:loadPlugin(path)
 		return nil, table.concat{"Error loading plugin \"", modname, "\": ", message}
 	end
 
-	if shared[modname] then
-		return raise(("plugin already loaded (from \"%s\")"):format(shared[modname].Path))
+	if self.plugins[modname] then
+		return raise(("plugin already loaded (from \"%s\")"):format(self.plugins[modname].Path))
 	end
 
 	local f, err = loadfile(path)
@@ -113,6 +105,7 @@ function bot:loadPlugin(path)
 		loadConfigTable = loadConfigTable;
 		CONFIG = configProxy(self.config);
 		public = {};
+		self = self;
 
 		ModuleName = modname;
 		Path = path;
@@ -121,7 +114,7 @@ function bot:loadPlugin(path)
 		commands = {};
 	}
 	plugin.PLUGIN = plugin
-	setmetatable(plugin, {__index = shared})
+	setmetatable(plugin, {__index = self.shared})
 
 	local function pluginAggregate(callback)
 		return function(...)
@@ -209,7 +202,16 @@ function bot:loadPlugin(path)
 		load(self)
 	end
 
-	shared[modname] = plugin.public
+	self.shared[modname] = plugin.public
+
+	return plugin
+end
+
+function bot:installPlugin(plugin)
+	local postload = plugin.PostLoad
+	if postload then
+		postload(self)
+	end
 
 	local think = plugin.Think
 	if think then
@@ -219,8 +221,7 @@ function bot:loadPlugin(path)
 	end
 
 	self:initCommandSystem(plugin)
-
-	return plugin
+	self.plugins[plugin.ModuleName] = plugin
 end
 
 --hooks intercepted by the bot system
@@ -284,6 +285,10 @@ function bot:loadPluginsFolder(dir)
 
 			if not plugin then
 				if err ~= disable_uid then
+					-- unroll changes made for PostLoad
+					for k, p in ipairs(newPlugins) do
+						self.shared[p.ModuleName] = nil
+					end
 					return nil, err
 				end
 			else
@@ -294,11 +299,7 @@ function bot:loadPluginsFolder(dir)
 	end
 
 	for k, plugin in ipairs(newPlugins) do
-		local postload = plugin.PostLoad
-		if postload then
-			postload(self)
-		end
-		table.insert(self.plugins, plugin) 
+		self:installPlugin(plugin)
   	end
 
 	return newPlugins

@@ -45,6 +45,7 @@ function new(config)
 		conn = conn;
 		config = config;
 		plugins = {};
+		shared = setmetatable({}, {__index = _G});
 		thinks = {};
 		queue = {interval = config.sendInterval or 0.5, lastSend = 0};
 		logger = config.logger and setfenv(config.logger) or function(message)
@@ -146,11 +147,17 @@ function bot:pollMessage(callback, ...)
 end
 
 --- Set the poll interval.
--- The default is the `sendInterval` config value, or 0.5 if not set.
 -- @param interval new interval in seconds
 function bot:setPollInterval(interval)
 	self.queue.interval = interval
 	self.queue.lastSend = time()
+end
+
+--- Get the poll interval.
+-- The default is the `sendInterval` config value, or 0.5 if not set.
+-- @returns the current poll interval in seconds.
+function bot:getPollInterval()
+	return self.queue.interval
 end
 
 --- Sends a message to a channel or user, or polls the message for delayed transmission depending on the poll interval.
