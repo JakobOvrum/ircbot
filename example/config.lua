@@ -15,3 +15,9 @@ admins
 }
 
 plugin_dir = "plugins"
+
+-- Uncomment if you use think hooks
+--maxThinkInterval = 2
+
+-- Uncomment to disable spam protection
+--sendInterval = 0

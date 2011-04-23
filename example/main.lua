@@ -4,7 +4,7 @@
 -- Edit the config file to suit your needs.
 -- Execute main.lua to start the bot.
 ------------------------------------------------------------------------
-
+require "irc.set"
 local ircbot = require "ircbot"
 local sleep = require "socket".sleep
 
@@ -20,10 +20,15 @@ if not plugins then
 	bot:log(err)
 end
 
-while true do
-	-- Call this for every bot you have to handle incoming data and events.
-	bot:think()
+local set = irc.set.new{timeout = config.maxThinkInterval}
 
-	-- This is here to use less CPU time. Remove or modify to suit your needs.
-	sleep(0.5)
+-- Add all bots to the set.
+set:add(bot)
+
+while true do
+	local ready = set:poll()
+	
+	for k, bot in ipairs(ready) do
+		bot:think()
+	end
 end
