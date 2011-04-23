@@ -7,11 +7,8 @@ local unpack = unpack
 local assert = assert
 local setmetatable = setmetatable
 local setfenv = setfenv
-local print = print
 local ipairs = ipairs
 local format = string.format
-
-require "tableprint"
 
 module "ircbot"
 
@@ -21,7 +18,7 @@ local argHandlers = {
 	string = function(expected, args)
 		if not args then
 			return nil, "arguments expected"
-		end		
+		end
 		local t = {args:match(expected)}
 		if #t == 0 then
 			return nil, "invalid argument format"
