@@ -279,7 +279,7 @@ function botHooks.Think(plugin, callback, env)
 			end
 		end);
 		schedule = 0;
-		enabled = env.initiallyDisabled or true;
+		enabled = env.enabled;
 	}
 
 	function env.wait(seconds)
