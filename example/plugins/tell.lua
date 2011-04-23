@@ -2,6 +2,9 @@
   Tell
 ]]
 
+-- Uncomment to enable
+disable()
+
 PLUGIN.Name = "Tell"
 local telldb = {}
 

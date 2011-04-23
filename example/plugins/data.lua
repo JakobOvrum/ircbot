@@ -4,6 +4,10 @@
   note: this plugin requires luaSolidState which you can get from the following url:
     http://github.com/TheLinx/luaSolidState
 ]]
+
+-- Uncomment to enable
+disable()
+
 local state = require("state")
 
 PLUGIN.Name = "Data Storage"

@@ -2,6 +2,9 @@
 	Last seen
 ]]
 
+-- Uncomment to enable
+disable()
+
 PLUGIN.Name = "Last seen"
 local time,seendb = os.time
 
