@@ -6,7 +6,6 @@
 ------------------------------------------------------------------------
 require "irc.set"
 local ircbot = require "ircbot"
-local sleep = require "socket".sleep
 
 -- Create a new bot.
 local bot, config = ircbot.new("config.lua")
