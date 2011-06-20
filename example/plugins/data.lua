@@ -1,36 +1,34 @@
 --[[
 	Data storage
-
-  note: this plugin requires luaSolidState which you can get from the following url:
-    http://github.com/TheLinx/luaSolidState
+  
+  note: this plugin requires state which you can get from the following url:
+	https://github.com/TheLinx/lstate
 ]]
-
--- Uncomment to enable
-disable()
+Name = "Data Storage"
+Hidden = true
 
 local state = require("state")
-
-PLUGIN.Name = "Data Storage"
-
 local cfg = CONFIG.data
 
-function Load()
+local function load()
 	local saved = state.load(cfg.name)
 	if saved then public = saved end
 end
-
-function Unload()
+local function save()
 	state.store(cfg.name, public)
+end
+
+function Load()
+	load()
+end
+function Unload()
+	save()
 end
 
 Hook "Think"
 {
-	lastSave = os.time();
-
 	function()
-		if lastSave+cfg.saveInterval < os.time() then
-			state.store(cfg.name, public)
-			lastSave = os.time()
-		end
+		save()
+		wait(cfg.saveInterval)
 	end
 }
