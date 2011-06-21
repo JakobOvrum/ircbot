@@ -7,6 +7,9 @@
 Name = "Data Storage"
 Hidden = true
 
+-- comment to enable this plugin
+disable()
+
 local state = require("state")
 local cfg = CONFIG.data
 
